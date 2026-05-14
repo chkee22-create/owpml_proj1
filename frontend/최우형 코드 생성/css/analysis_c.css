@@ -1,0 +1,326 @@
+/* =====================
+   analysis.css
+   ===================== */
+
+/* 메인 레이아웃 */
+.analysis-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #f8f8f8;
+  overflow: hidden;
+}
+
+/* 상단 헤더 */
+.analysis-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 36px 20px;
+  background: #f8f8f8;
+}
+
+.analysis-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.analysis-header-btns {
+  display: flex;
+  gap: 12px;
+}
+
+.header-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 2px solid #ccc;
+  background: white;
+  font-size: 15px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.header-btn:hover {
+  background: #f0f0f0;
+}
+
+.header-btn.share {
+  border-color: #bbb;
+}
+
+/* 바디: 업로드 패널 + 채팅 */
+.analysis-body {
+  display: flex;
+  flex: 1;
+  gap: 0;
+  padding: 0 36px 30px;
+  overflow: hidden;
+}
+
+/* =====================
+   왼쪽 업로드 패널
+   ===================== */
+.upload-panel {
+  width: 220px;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-right: 24px;
+}
+
+/* 드래그 앤 드롭 영역 */
+.drop-zone {
+  border: 2.5px dashed #aaa;
+  border-radius: 16px;
+  padding: 28px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  background: white;
+  transition: border-color 0.2s, background 0.2s;
+  text-align: center;
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+  border-color: #0ea5a4;
+  background: #f0fafa;
+}
+
+.drop-zone i {
+  font-size: 28px;
+  color: #888;
+}
+
+.drop-zone p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+}
+
+.drop-sub {
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  color: #aaa !important;
+}
+
+.drop-zone input[type="file"] {
+  display: none;
+}
+
+/* 업로드 파일 목록 */
+.upload-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.upload-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1.5px solid #ddd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.upload-file-item i {
+  color: #4c8bf5;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #333;
+}
+
+.file-size {
+  color: #aaa;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.upload-file-item.analyzing {
+  border-color: #0ea5a4;
+  background: #f0fafa;
+}
+
+.file-badge {
+  background: #0ea5a4;
+  color: white;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* 분석 중 상태 표시 */
+.analyzing-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #e6f7f7;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #0ea5a4;
+  font-weight: 500;
+}
+
+.analyzing-spin {
+  animation: spin 1.2s linear infinite;
+}
+
+/* =====================
+   오른쪽 채팅 영역
+   ===================== */
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 20px;
+  border: 2px solid #e0e0e0;
+  overflow: hidden;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 채팅 행 */
+.chat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.chat-row.user {
+  justify-content: flex-end;
+}
+
+/* 아바타 */
+.chat-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #0ea5a4;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* 말풍선 */
+.chat-bubble {
+  max-width: 68%;
+  padding: 14px 18px;
+  border-radius: 16px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.ai-bubble {
+  background: #f0f0f0;
+  color: #333;
+  border-top-left-radius: 4px;
+}
+
+.user-bubble {
+  background: #0ea5a4;
+  color: white;
+  border-top-right-radius: 4px;
+}
+
+/* 차트 생성 중 로딩 */
+.chart-generating {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #f8fffe;
+  border: 1.5px solid #b2e8e8;
+  border-radius: 16px;
+  padding: 18px 24px;
+  font-size: 15px;
+  color: #0ea5a4;
+  font-weight: 500;
+}
+
+.chart-spin i {
+  font-size: 22px;
+  animation: spin 1.2s linear infinite;
+  color: #0ea5a4;
+}
+
+@keyframes spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* =====================
+   하단 입력창
+   ===================== */
+.analysis-chat-box {
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  height: 72px;
+  border-top: 2px solid #eee;
+  background: white;
+  gap: 8px;
+}
+
+.analysis-chat-box .plus-btn,
+.analysis-chat-box .send-btn {
+  border: none;
+  background: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #666;
+  transition: color 0.15s;
+}
+
+.analysis-chat-box .plus-btn:hover,
+.analysis-chat-box .send-btn:hover {
+  color: #0ea5a4;
+}
+
+.analysis-chat-box .chat-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  color: #333;
+  background: transparent;
+}
+
+.analysis-chat-box .chat-input::placeholder {
+  color: #bbb;
+}
+
+/* active 사이드바 항목 */
+.active-menu {
+  background: #dde8d2;
+}
