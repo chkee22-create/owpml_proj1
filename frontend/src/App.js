@@ -1,18 +1,23 @@
-import './App.css';
+// App.js - 페이지 라우팅 메인 파일
+// Login은 이제 팝업 모달이라 별도 라우트 없음
 
-function App() {
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+import Home      from './Kim_frontend_code/Home_K';
+import Analysis  from './Kim_frontend_code/Analysis_K';
+import Dashboard from './Kim_frontend_code/Dashboard_K';
+import Mypage    from './Kim_frontend_code/Mypage_K';
+
+export default function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>🔍 HWP-Xray</h1>
-        <p>AI 기반 학술 논문 분석 챗봇</p>
-        <div style={{ marginTop: '20px', padding: '20px', border: '1px solid #61dafb', borderRadius: '10px' }}>
-          <h3>팀원 여러분 환영합니다! 👋</h3>
-          <p>현재 프론트엔드 기본 세팅이 완료되었습니다.</p>
-        </div>
-      </header>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/"          element={<Home />} />
+        <Route path="/analysis"  element={<Analysis />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/mypage"    element={<Mypage />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
-
-export default App;

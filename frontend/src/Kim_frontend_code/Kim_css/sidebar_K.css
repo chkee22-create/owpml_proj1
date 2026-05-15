@@ -1,0 +1,230 @@
+/* sidebar.css - 사이드바 스타일 */
+
+.sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0;
+  border-right: 1px solid #b2dfb2;
+  position: relative;
+  z-index: 10;
+}
+
+/* 로고 영역 */
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 20px;
+  border-bottom: 1px solid #b2dfb2;
+}
+
+.sidebar-logo img {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #fff;
+  padding: 2px;
+}
+
+.sidebar-logo .logo-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dark);
+  line-height: 1.3;
+}
+
+.sidebar-logo .logo-text span {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-gray);
+}
+
+/* 새 채팅 버튼 */
+.btn-new-chat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 12px 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-dark);
+  background: rgba(255,255,255,0.5);
+  transition: background 0.2s;
+  width: calc(100% - 24px);
+}
+
+.btn-new-chat:hover {
+  background: rgba(255,255,255,0.8);
+}
+
+/* 최근 대화 섹션 */
+.recent-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-gray);
+  padding: 4px 16px 8px;
+  letter-spacing: 0.5px;
+}
+
+.recent-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-item:hover {
+  background: rgba(255,255,255,0.6);
+}
+
+/* 하단 메뉴 */
+.sidebar-bottom {
+  border-top: 1px solid #b2dfb2;
+  padding: 12px 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+  text-align: left;
+}
+
+.sidebar-menu-item:hover {
+  background: rgba(255,255,255,0.6);
+}
+
+.sidebar-menu-item .menu-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+/* ─── 비로그인 팝업 ─── */
+.login-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.25);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 0 0 40px 16px;
+}
+
+.login-popup {
+  background: var(--sidebar-bg);
+  border: 1px solid #b2dfb2;
+  border-radius: 16px;
+  padding: 24px;
+  width: 200px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+  animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.login-popup .popup-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.login-popup .popup-logo img {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+}
+
+.login-popup h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-dark);
+}
+
+.login-popup p {
+  font-size: 12px;
+  color: var(--text-gray);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.popup-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.popup-buttons .btn-popup-login {
+  flex: 1;
+  padding: 7px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--accent-green);
+  color: #fff;
+  transition: background 0.2s;
+}
+
+.popup-buttons .btn-popup-login:hover {
+  background: #388e3c;
+}
+
+.popup-buttons .btn-popup-signup {
+  flex: 1;
+  padding: 7px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--accent-green);
+  color: var(--accent-green);
+  transition: background 0.2s;
+}
+
+.popup-buttons .btn-popup-signup:hover {
+  background: rgba(76,175,80,0.1);
+}
+
+/* ── 선택된 채팅 항목 하이라이트 ── */
+.recent-item.active {
+  background: var(--accent-green);
+  color: #fff;
+  font-weight: 600;
+}

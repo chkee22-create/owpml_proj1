@@ -1,4 +1,42 @@
 import React, { useState } from 'react';
+import styled from 'styled-components';
+import { palette } from '../shared/palette';
+
+const LoginButton = styled.button`
+  background-color: ${palette.indigo[4]};
+  color: white;
+  padding: 10px;
+  border: none;
+  border-radius: 4px; /* 조금 더 부드럽게 추가해봤어요 */
+  cursor: pointer;
+  width: 100%;       /* 버튼을 가득 채우고 싶을 때 */
+
+  &:hover {
+    background-color: ${palette.indigo[6]}; /* 마우스 올리면 색 변화 */
+  }
+`;
+
+const GmailButton = styled.button`
+  background-color: ${palette.blue[4]};
+  color: white;
+  padding: 10px;
+  border: none;
+  border-radius: 4px; /* 조금 더 부드럽게 추가해봤어요 */
+  cursor: pointer;
+  width: 100%;       /* 버튼을 가득 채우고 싶을 때 */
+
+  &:hover {
+    background-color: ${palette.blue[6]}; /* 마우스 올리면 색 변화 */
+  }
+`;
+
+const BackGround = styled.div`
+  background-color: ${palette.green[0]};
+  min-height: 100vh; /* 화면 높이를 100% 꽉 채움 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+`;
 
 function MyLogin() {
   // 1. Counter의 [number, setNumber] 대신 아이디, 비밀번호 상자를 만듭니다.
@@ -28,9 +66,10 @@ function MyLogin() {
   };
 
   return (
+  <BackGround>
     <div style={{ padding: '20px', maxWidth: '300px', margin: '0 auto' }}>
-      <h2>나만의 로그인 페이지</h2>
-      
+      <h2>로그인</h2>
+      <GmailButton onClick={handleLoginSubmit}>Gmail로 연동하기</GmailButton>
       {/* 아이디 입력창 */}
       <div style={{ marginBottom: '10px' }}>
         <label>ID : </label>
@@ -54,8 +93,9 @@ function MyLogin() {
       </div>
 
       {/* 로그인 버튼 */}
-      <button onClick={handleLoginSubmit}>Login</button>
+      <LoginButton onClick={handleLoginSubmit}>Login</LoginButton>
     </div>
+  </BackGround>
   );
 }
 
