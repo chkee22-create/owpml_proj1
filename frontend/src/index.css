@@ -1,0 +1,13 @@
+/* 전역 스타일 초기화 - 스크롤바 절대 방지 */
+* {
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html, body, #root, .App {
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important; /* 브라우저 창 자체의 스크롤을 완전히 차단 */
+  background-color: #f8fafc;
+}
