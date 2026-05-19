@@ -120,42 +120,6 @@ const FeatureCard = styled.div`
   }
 `;
 
-/* 검색바 상단에 배치되는 파일 타겟 필터 태그 로우 */
-const FileTagRow = styled.div`
-  display: flex; gap: 8px; margin-bottom: 12px;
-  
-  .tag { 
-    background: #ffffff; 
-    border: 1px solid ${palette.slate[2]}; 
-    padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; color: ${palette.slate[6]}; 
-    display: flex; align-items: center; gap: 6px; 
-    cursor: pointer;
-    transition: all 0.15s;
-    
-    &:hover { background: ${palette.slate[1]}; color: ${palette.slate[8]}; border-color: ${palette.slate[3]}; }
-  }
-`;
-
-/* 메인 대형 통합 검색 창 */
-const MainSearchBar = styled.div`
-  width: 100%; max-width: 800px; background: white; 
-  border: 2px solid ${palette.slate[2]};  
-  border-radius: 16px; padding: 8px 18px; display: flex; align-items: center;
-  transition: border-color 0.15s;
-  
-  &:focus-within { border-color: ${palette.slate[5]}; } 
-  
-  input { 
-    flex: 1; border: none; outline: none; padding: 10px 4px; 
-    font-size: 14.5px; font-weight: 600; color: ${palette.slate[8]};
-    &::placeholder { color: ${palette.slate[4]}; }
-  }
-  i { 
-    color: ${palette.slate[4]}; font-size: 18px; cursor: pointer; 
-    transition: color 0.15s;
-    &:hover { color: ${palette.teal[5]}; } 
-  }
-`;
 
 /* ❌ 팝업 3, 4, 5번 모달 관련 스타일드 컴포넌트(ModalOverlay, FigAuthBox 등) 중복되어 전면 삭제 완료 */
 
@@ -199,7 +163,7 @@ function Home() {
     else if (menuName === '분석 비교') setViewMode('분석 비교');
     else if (menuName === '내 프로젝트') setViewMode('내 프로젝트');
     else if (menuName === '마이페이지' || menuName === '프로필클릭') setViewMode('마이페이지');
-    else if (menuName === '새 채팅') { setViewMode('main'); setRestoredData(null); }
+    else if (menuName === '새 채팅') { setViewMode('분석 비교'); setRestoredData(null); }
   };
 
   const openLoginPopup = () => {
@@ -342,17 +306,6 @@ function Home() {
                 <div className="text-box"><h4>협업공간</h4><p>초대 코드로 팀원을 초대하고, 분석 결과를 함께 검토합니다.</p></div>
               </FeatureCard>
             </GridContainer>
-
-            <FileTagRow>
-              <div className="tag"><i className="fa-regular fa-file-pdf" style={{color:'#e74c3c'}}></i> main123.pdf <i className="fa-solid fa-xmark" style={{fontSize:'10px', marginLeft:'4px'}}></i></div>
-              <div className="tag"><i className="fa-regular fa-file-word" style={{color:'#3498db'}}></i> main123.hwp <i className="fa-solid fa-xmark" style={{fontSize:'10px', marginLeft:'4px'}}></i></div>
-            </FileTagRow>
-
-            <MainSearchBar>
-              <i className="fa-solid fa-plus" style={{marginRight:'14px'}}></i>
-              <input type="text" placeholder="여기에 논문 분석 질문을 입력하세요..." />
-              <i className="fa-regular fa-paper-plane"></i>
-            </MainSearchBar>
           </MainDashboard>
         )}
         
