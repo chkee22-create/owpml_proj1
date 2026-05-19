@@ -1,360 +1,313 @@
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { palette } from '../shared/palette';
 
-/* ── 전체 페이지 레이아웃 ── */
+/* ==========================================================================
+   🎨 1. 공통 및 메인 레이아웃 스타일
+   ========================================================================== */
 const ProjectsContainer = styled.div`
-  flex: 1;
-  padding: 40px 52px;                   /* 💡 마이페이지 우측 패딩(52px)과 수치를 맞춰 라우팅 이동 시 덜컥거림 방지 */
-  background: #ffffff;
-  overflow-y: auto;
-  box-sizing: border-box;
+  flex: 1; padding: 40px 52px; background: #ffffff; overflow-y: auto; box-sizing: border-box;
 `;
 
-/* ── 상단 타이틀 및 새 프로젝트 생성 버튼 영역 ── */
 const HeaderSection = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-
-  h2 {
-    font-size: 22px;                    /* 💡 타이틀 크기를 26px에서 22px로 살짝 조율하여 시스템 전체 서체 위계 통일 */
-    font-weight: 800;
-    color: #1e293b;
-    margin: 0;
-  }
-
-  .new-project-btn {
-    background: #0ea5a4;                /* 💡 기존 연두색(#22c55e)을 서비스 시그니처인 민트/틸 컬러로 변경! */
-    color: #ffffff;                     /* 💡 메인 테마색에 맞춰 텍스트 컬러를 화이트로 선명하게 변경 */
-    border: none;
-    border-radius: 8px;                 /* 💡 타원형(20px)에서 모던하고 차분한 각진 라운드(8px)로 커스텀 */
-    padding: 10px 18px;                 /* 💡 버튼이 가로로 너무 뚱뚱해지지 않게 컴팩트 패딩 조정 */
-    font-size: 14px;                    /* 💡 기본 본문 700 굵기와 매칭 유도 */
-    font-weight: 700;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: background 0.15s ease-in-out;
-    &:hover { background: #0d9493; }    /* 💡 호버 시 한 톤 어두운 민트색으로 감도 조절 */
-  }
-`;
-
-/* ── 초대 코드 입력 바 영역 ── */
-const InviteCodeBar = styled.div`
-  display: flex;
-  align-items: center;
-  background: #f8fafc;                  /* 💡 어두운 연회색(#e2e8f0)에서 분석 페이지 좌측 패널과 같은 산뜻한 Slate 50으로 변경 */
-  border: 1px solid #e2e8f0;            /* 💡 외곽 실선을 얇게 추가하여 마이페이지 가이드라인과 패밀리 룩 완성 */
-  border-radius: 12px;                  /* 💡 둥글기 값을 8px에서 12px로 부드럽게 상향 */
-  padding: 14px 20px;
   margin-bottom: 32px;
-  gap: 12px;
-
-  /* 열쇠 아이콘 */
-  .key-icon {
-    font-size: 16px;
-    color: #0ea5a4;                     /* 💡 튀는 황금색(#f59e0b) 대신 브랜드 아이덴티티 컬러로 포인트를 주어 세련미 가미 */
-  }
-
-  /* 안내 문구 라벨 */
-  .label-text {
-    font-size: 13.5px;                  /* 💡 조금 더 조밀한 서체 크기로 최적화 */
-    font-weight: 700;
-    color: #475569;                     /* 💡 Slate 600 계열로 차분하게 세팅 */
-  }
-
-  /* 실제 초대 코드 입력 컴포넌트 */
-  .code-input {
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 13px;
-    font-family: monospace;
-    font-weight: 700;
-    color: #1e293b;
-    width: 110px;                       /* 💡 여백을 고려하여 10px 확장 */
-    text-align: center;
-    &:focus { border-color: #64748b; outline: none; }
-  }
-
-  /* 참여하기(Join) 버튼 */
-  .join-btn {
-    margin-left: auto;
-    background: #ffffff;                /* 💡 무거운 그레이 톤 배경에서 정갈한 화이트 버튼 스타일로 전환 */
-    color: #475569;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    padding: 8px 18px;                  /* 💡 패딩 규격 슬림하게 다듬기 */
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s;
-    &:hover { background: #f1f5f9; color: #1e293b; border-color: #94a3b8; }
-  }
+  h2 { font-size: 22px; font-weight: 800; color: #1e293b; margin: 0; }
 `;
 
-/* ── 프로젝트 카드 격자 그리드 (3열 구조) ── */
-const ProjectGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;                            /* 💡 격자 간격 24px 유지 (시원한 배열 구도 완성) */
-`;
-
-/* 기존 프로젝트 카드 스타일 */
-const ProjectCard = styled.div`
-  background: #ffffff;
-  border: 1px solid #e2e8f0;            /* 💡 경계 테두리를 조금 더 은은하게 조정 (#cbd5e1 -> #e2e8f0) */
-  border-radius: 12px;
-  padding: 24px;                        /* 💡 카드 내부 숨통을 트기 위해 20px에서 24px로 확장 */
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  box-shadow: none;                     /* 💡 전체적인 플랫 감성을 유지하기 위해 그림자 제거 */
-  height: 180px;                        /* 💡 늘어난 패딩과 내부 요소를 감당하도록 높이를 160px에서 180px로 여유 있게 조율 */
-  box-sizing: border-box;
-  cursor: pointer;
-  transition: all 0.2s ease-in-out;
-
-  /* 💡 마우스 올렸을 때 메인 기능 카드들과 동일한 모션 룩앤필 동기화 */
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04);
-    border-color: #cbd5e1;
-  }
-
-  /* 카드 내 상단 카테고리 태그 (예: OWPML 필터링 등) */
-  .tag {
-    align-self: flex-start;
-    background: #f1f5f9;
-    color: #475569;
-    font-size: 11px;
-    font-weight: 800;
-    padding: 3px 10px;
-    border-radius: 12px;
-    margin-bottom: 12px;
-    
-    /* HWPX/HWP 필터 커스텀 컬러 */
-    &.hwp { 
-      background: #e6f4f4;              /* 💡 쨍한 연두색 대신 메인 소프트 민트 계열 배경 부여 */
-      color: #0ea5a4;                   /* 💡 텍스트 컬러 민트색 매칭 */
-    } 
-  }
-
-  /* 프로젝트 명 타이틀 */
-  h3 {
-    font-size: 16px;                    /* 💡 20px에서 16px로 내밀하게 압축하여 서체가 카드 밖으로 넘치지 않게 방어 */
-    font-weight: 800;
-    color: #1e293b;
-    margin: 0 0 6px 0;
-    overflow: hidden;                   /* 💡 프로젝트 제목이 길어져도 두 줄 이상 안 깨지게 말줄임표 안전장치 */
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 80%;                     /* 💡 우측 프로필 아바타 영역 침범 방지 */
-  }
-
-  /* 생성 및 수정 날짜 */
-  .date {
-    font-size: 11px;
-    color: #94a3b8;
-    font-weight: 700;
-    margin-bottom: auto;                /* 💡 하단 푸터 영역을 바닥으로 밀어내기 위한 오토 마진 */
-  }
-
-  /* 카드 최하단 정보부 바 */
-  .card-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-top: 1px solid #f1f5f9;
-    padding-top: 12px;
-    margin-top: 12px;
-  }
-
-  /* 하단 메타 정보 (참여 인원, 업로드 문서 수 등) */
-  .meta-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 12px;
-    color: #64748b;
-    font-weight: 700;
-    i { color: #94a3b8; }                /* 💡 아이콘 톤을 부드럽게 세팅 */
-  }
-
-  /* 더보기/수정 아이콘 단추 */
-  .edit-icon-btn {
-    background: none;
-    border: none;
-    font-size: 15px;
-    color: #94a3b8;
-    cursor: pointer;
-    transition: color 0.1s;
-    &:hover { color: #1e293b; }
-  }
-
-  /* 우측 상단 배치용 유저 프로필 썸네일 아바타 (정밀 조율 완료) */
-  .profile-thumbnail {
-    position: absolute;
-    right: 24px;                        /* 💡 카드 우측 패딩(24px)과 정렬 선 일치 */
-    top: 24px;                          /* 💡 카드 상단 패딩(24px)과 정렬 선 일치 */
-    width: 32px;                        /* 💡 사이드바 프로필 규격과 매칭하여 32px 밸런싱 */
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-
-    /* 💡 [수정 포인트] 아바타 영역 아이콘 핏 맞춤형 설계 */
-    i {
-      font-size: 32px;
-      color: ${palette.slate[4]};
-    }
-  }
-`;
-
-/* 💡 비어있는 [새 프로젝트 추가] 더미 카드 스펙 구체화 */
-const EmptyCard = styled.div`
-  background: #ffffff;
-  border: 2px dashed #cbd5e1;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 180px;                        /* 💡 메인 프로젝트 카드와 완전히 높이를 동기화 (160px -> 180px) */
-  cursor: pointer;
-  color: #94a3b8;
-  font-weight: 700;
-  font-size: 13.5px;                    /* 💡 조밀한 서체 스펙 적용 */
-  gap: 6px;
-  box-sizing: border-box;
-  transition: all 0.2s ease-in-out;
-
-  &:hover {
-    transform: translateY(-2px);        /* 💡 빈 카드도 호버 시 같이 부드럽게 들리는 모션 동기화 */
-    border-color: #0ea5a4;              /* 💡 호버 시 테두리 점등선을 브랜드 틸 컬러로 밝혀 시각적 만족도 상향 */
-    color: #0ea5a4;
-  }
-
-  .plus-icon {
-    font-size: 16px;                    /* 💡 폰트어썸 플러스 마크 크기 핏 매칭 */
-  }
-`;
-
-function Projects() {
+const SectionTitleRow = styled.div`
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; 
+  h3 { font-size: 18px; font-weight: 800; color: #1e293b; margin: 0; } 
   
-  const handlePreventAction = (e) => {
+  .btn-group {
+    display: flex; gap: 10px;
+  }
+
+  .sub-btn { 
+    background: #ffffff; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 6px; 
+    font-weight: 700; color: #64748b; font-size: 12px; cursor: pointer; transition: all 0.15s;
+    &:hover { background: #f8fafc; color: #1e293b; }
+  } 
+
+  .primary-btn {
+    background: #0ea5a4; color: #ffffff; border: none; border-radius: 8px;
+    padding: 10px 18px; font-size: 14px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; transition: background 0.15s;
+    &:hover { background: #0d9493; }
+  }
+`;
+
+/* ==========================================================================
+   🎨 2. 시각화 보관함 및 프로젝트 카드 스타일
+   ========================================================================== */
+const VisualSection = styled.div` margin-bottom: 48px; `;
+const VisualBoxContainer = styled.div` display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; `;
+
+const VisualCard = styled.div`
+  border: 1px solid #e2e8f0; border-radius: 12px; background: white; padding: 16px;
+  cursor: pointer; transition: all 0.2s ease-in-out; box-sizing: border-box;
+  position: relative; /* 💡 삭제 버튼 위치의 기준점 */
+
+  &:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04); border-color: #cbd5e1; }
+
+  /* 💡 삭제 버튼: 평소엔 투명하다가 호버 시 등장 */
+  .delete-visual-btn {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(255, 255, 255, 0.9); border: 1px solid #e2e8f0;
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #94a3b8; font-size: 12px; cursor: pointer;
+    opacity: 0; transition: all 0.2s; z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    
+    &:hover { color: #e74c3c; border-color: #fca5a5; background: #fef2f2; }
+  }
+
+  &:hover .delete-visual-btn { opacity: 1; }
+
+  .mock-img { 
+    height: 80px; background: #f1f5f9; border-radius: 8px; margin-bottom: 12px; 
+    display: flex; align-items: center; justify-content: center; 
+    font-size: 24px; color: #0ea5a4; 
+  }
+  h4 { margin: 0 0 6px 0; font-size: 14px; font-weight: 700; color: #1e293b; }
+  span { font-size: 11.5px; color: #94a3b8; font-weight: 600; }
+`;
+
+const ProjectGrid = styled.div` display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; `;
+const ProjectCard = styled.div`
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px;
+  display: flex; flex-direction: column; position: relative; height: 180px; box-sizing: border-box;
+  cursor: pointer; transition: all 0.2s ease-in-out;
+  &:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04); border-color: #cbd5e1; }
+  
+  .tag { align-self: flex-start; background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 12px; margin-bottom: 12px; &.hwp { background: #e6f4f4; color: #0ea5a4; } }
+  h3 { font-size: 16px; font-weight: 800; color: #1e293b; margin: 0 0 6px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%; }
+  .title-input { font-size: 16px; font-weight: 800; color: #1e293b; margin: 0 0 6px 0; padding: 2px 6px; border: 1px solid #0ea5a4; border-radius: 4px; outline: none; width: 80%; box-sizing: border-box; font-family: inherit; background: #f8fafc; }
+  .date { font-size: 11px; color: #94a3b8; font-weight: 700; margin-bottom: auto; }
+  .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 12px; margin-top: 12px; }
+  .meta-info { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #64748b; font-weight: 700; i { color: #94a3b8; } }
+  .action-btns { display: flex; gap: 10px; button { background: none; border: none; font-size: 15px; color: #94a3b8; cursor: pointer; transition: color 0.1s; &.edit-icon-btn:hover { color: #1e293b; } &.delete-icon-btn:hover { color: #e74c3c; } } }
+  .profile-thumbnail { position: absolute; right: 24px; top: 24px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: transparent; i { font-size: 32px; color: ${palette.slate[4]}; } }
+`;
+const EmptyCard = styled.div`
+  background: #ffffff; border: 2px dashed #cbd5e1; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 180px; cursor: pointer; color: #94a3b8; font-weight: 700; font-size: 13.5px; gap: 6px; box-sizing: border-box; transition: all 0.2s ease-in-out;
+  &:hover { transform: translateY(-2px); border-color: #0ea5a4; color: #0ea5a4; }
+`;
+
+/* ==========================================================================
+   🎨 3. 전체보기 모달 (View All Modal) 스타일
+   ========================================================================== */
+const ModalOverlay = styled.div`
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(2px);
+  display: flex; justify-content: center; align-items: center; z-index: 900;
+`;
+const ModalContent = styled.div`
+  background: #ffffff; width: 800px; max-height: 85vh; border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; overflow: hidden;
+  .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 24px 32px; border-bottom: 1px solid #e2e8f0; h3 { margin: 0; font-size: 20px; font-weight: 800; color: #1e293b; } button { background: none; border: none; font-size: 20px; color: #94a3b8; cursor: pointer; transition: 0.15s; &:hover { color: #1e293b; } } }
+  .modal-body { padding: 32px; overflow-y: auto; flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+`;
+
+/* ==========================================================================
+   🎨 4. 사이드 드로어 (Side Drawer) 스타일
+   ========================================================================== */
+const DrawerBackdrop = styled.div`
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.15); backdrop-filter: blur(1px); display: ${props => props.$show ? 'block' : 'none'}; z-index: 1000;
+`;
+const DrawerContainer = styled.div`
+  position: fixed; top: 0; right: ${props => props.$show ? '0' : '-460px'}; width: 420px; height: 100vh; background: #ffffff; box-shadow: -10px 0 30px -5px rgba(0, 0, 0, 0.08); border-left: 1px solid #e2e8f0; z-index: 1001; transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1); padding: 40px 32px; box-sizing: border-box; display: flex; flex-direction: column;
+  .drawer-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; .title-wrap { h3 { font-size: 18px; font-weight: 800; color: #1e293b; margin: 0 0 6px 0; } span { font-size: 12px; color: #94a3b8; font-weight: 600; } } .close-btn { background: none; border: none; font-size: 18px; color: #94a3b8; cursor: pointer; &:hover { color: #1e293b; } } }
+  .drawer-body { flex: 1; overflow-y: auto; .visual-preview { width: 100%; height: 180px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 24px; display: flex; align-items: center; justify-content: center; font-size: 52px; color: #0ea5a4; } .info-section { margin-bottom: 24px; h5 { font-size: 13px; font-weight: 800; color: #475569; margin: 0 0 8px 0; } p { font-size: 13.5px; color: #334155; line-height: 1.6; margin: 0; font-weight: 500; } } .details-list { background: #f8fafc; border-radius: 8px; padding: 16px; margin-top: 16px; display: flex; flex-direction: column; gap: 12px; .detail-item { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; .lbl { color: #64748b; } .val { color: #1e293b; font-weight: 700; } } } }
+  .drawer-footer { margin-top: auto; padding-top: 20px; border-top: 1px solid #f1f5f9; .action-btn { width: 100%; background: #1e293b; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 13.5px; font-weight: 700; cursor: pointer; &:hover { background: #0f172a; } } }
+`;
+
+/* ==========================================================================
+   📦 메인 컴포넌트 로직
+   ========================================================================== */
+function Projects() {
+  // 💡 1. 프로젝트 상태
+  const [projects, setProjects] = useState([
+    { id: 1, type: 'PDF x 3', title: '이미지 분류', date: '2026.05.04', charts: 2, isHwp: false },
+    { id: 2, type: 'hwp', title: '자연어 처리', date: '2026.05.04', charts: 2, isHwp: true },
+    { id: 3, type: 'PDF', title: '논문 분석 처리', date: '2026.05.04', charts: 0, isHwp: false },
+  ]);
+
+  // 💡 2. 저장된 시각화 데이터를 useState 상태로 변경 (최대 10개 관리를 위함)
+  const [visuals, setVisuals] = useState([
+    { id: 101, title: '정확도 비교 차트', date: '2026.05.13', icon: 'fa-chart-column', desc: '모델 성능 모니터링 결과물입니다.', details: [ {lbl: '데이터 모델', val: 'LangChain RAG'}, {lbl: '정확도', val: '94.2%'} ] },
+    { id: 102, title: '데이터셋 분포', date: '2026.04.22', icon: 'fa-chart-pie', desc: '포맷별 정제 데이터 통계량입니다.', details: [ {lbl: '총 파일 수', val: '24개'}, {lbl: 'PDF 문서', val: '65%'} ] },
+    { id: 103, title: '모델 성능 비교표', date: '2026.03.04', icon: 'fa-table-cells', desc: '응답 지연 시간(Latency) 비교 테이블입니다.', details: [ {lbl: 'Vector DB', val: 'Pinecone'}, {lbl: 'Latency', val: '1.2s'} ] },
+    { id: 104, title: '토큰 소모량 추이', date: '2026.02.15', icon: 'fa-chart-line', desc: '일별 API 토큰 사용량 트렌드 그래프입니다.', details: [ {lbl: '최대 사용일', val: '02.12'}, {lbl: '총 소모량', val: '142k'} ] },
+    { id: 105, title: '사용자 질의 패턴', date: '2026.01.28', icon: 'fa-cloud', desc: '가장 많이 질문된 키워드 워드클라우드입니다.', details: [ {lbl: 'Top 키워드', val: '할루시네이션'}, {lbl: '분석 문서 수', val: '88건'} ] },
+  ]);
+
+  const [editingProjectId, setEditingProjectId] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+  
+  const [selectedVisual, setSelectedVisual] = useState(null);
+  const [isViewAllOpen, setIsViewAllOpen] = useState(false);
+
+  /* --- 프로젝트 핸들러 --- */
+  const handleAddProject = (e) => {
     e.preventDefault();
+    if (projects.length >= 10) { alert("프로젝트는 최대 10개까지 생성 가능합니다."); return; }
+    setProjects([...projects, { id: Date.now(), type: 'New', title: `새 프로젝트 ${projects.length + 1}`, date: new Date().toLocaleDateString('ko-KR').replace(/. /g, '.').slice(0, -1), charts: 0, isHwp: false }]);
+  };
+
+  const handleDeleteProject = (e, id) => {
+    e.preventDefault(); e.stopPropagation();
+    if(window.confirm("이 프로젝트를 정말 삭제하시겠습니까?")) {
+      setProjects(projects.filter(project => project.id !== id));
+      if (editingProjectId === id) setEditingProjectId(null);
+    }
+  };
+
+  const handleEditClick = (e, project) => { e.preventDefault(); e.stopPropagation(); setEditingProjectId(project.id); setEditTitle(project.title); };
+  const handleTitleSave = () => { if (!editTitle.trim()) return; setProjects(projects.map(p => p.id === editingProjectId ? { ...p, title: editTitle.trim(), date: new Date().toLocaleDateString('ko-KR').replace(/. /g, '.').slice(0, -1) } : p)); setEditingProjectId(null); };
+  const handleKeyDown = (e) => { if (e.key === 'Enter') handleTitleSave(); else if (e.key === 'Escape') setEditingProjectId(null); };
+
+  /* 💡 --- 시각화 데이터 핸들러 --- */
+  const handleAddVisualTest = (e) => {
+    e.preventDefault();
+    if (visuals.length >= 10) {
+      alert("시각화 보관함은 최대 10개까지만 저장할 수 있습니다. 기존 데이터를 삭제해주세요.");
+      return;
+    }
+    const newVisual = { 
+      id: Date.now(), title: `새로운 차트 ${visuals.length + 1}`, date: new Date().toLocaleDateString('ko-KR').replace(/. /g, '.').slice(0, -1), 
+      icon: 'fa-chart-area', desc: '새로 저장된 시각화 데이터입니다.', details: [ {lbl: '상태', val: 'New'} ] 
+    };
+    setVisuals([newVisual, ...visuals]); // 최신 항목이 맨 앞으로 오게 추가
+  };
+
+  const handleDeleteVisual = (e, id) => {
+    e.preventDefault(); 
+    e.stopPropagation(); // 카드 전체 클릭(사이드 드로어 열림) 이벤트 방지
+    if(window.confirm("이 시각화 데이터를 삭제하시겠습니까?")) {
+      setVisuals(visuals.filter(visual => visual.id !== id));
+      // 만약 현재 삭제하는 카드의 드로어가 열려있다면 같이 닫아줌
+      if (selectedVisual && selectedVisual.id === id) {
+        setSelectedVisual(null);
+      }
+    }
   };
 
   return (
     <ProjectsContainer>
-      {/* 1. 상단 헤더 영역 */}
-      <HeaderSection>
-        <h2>내 프로젝트</h2>
-        <button type="button" className="new-project-btn" onClick={handlePreventAction}>
-          + 새 프로젝트...
-        </button>
-      </HeaderSection>
+      <HeaderSection><h2>내 프로젝트</h2></HeaderSection>
 
-      {/* 2. 초대 코드 입력 바 */}
-      <InviteCodeBar>
-        <i className="fa-solid fa-key key-icon"></i>
-        <span className="label-text">초대 코드로 팀 프로젝트 참여 :</span>
-        <input type="text" className="code-input" value="aa33ddf" readOnly />
-        <button type="button" className="join-btn" onClick={handlePreventAction}>참여하기</button>
-      </InviteCodeBar>
+      {/* 1. 시각화 보관함 영역 (메인 화면) */}
+      <VisualSection>
+        <SectionTitleRow>
+          {/* 💡 제목 옆에 10개 제한 카운터 표시 */}
+          <h3>저장된 시각화 보관함 <span style={{fontSize: '14px', color: '#94a3b8', fontWeight: '600', marginLeft: '6px'}}>({visuals.length}/10)</span></h3>
+          <div className="btn-group">
+            
+            <button type="button" className="sub-btn" onClick={() => setIsViewAllOpen(true)}>전체 보기</button>
+          </div>
+        </SectionTitleRow>
+        
+        <VisualBoxContainer>
+          {visuals.slice(0, 3).map((visual) => (
+            <VisualCard key={visual.id} onClick={() => setSelectedVisual(visual)}>
+              {/* 💡 카드 우측 상단 삭제 버튼 배치 */}
+              <button className="delete-visual-btn" onClick={(e) => handleDeleteVisual(e, visual.id)} title="시각화 데이터 삭제">
+                <i className="fa-solid fa-trash"></i>
+              </button>
+              
+              <div className="mock-img"><i className={`fa-solid ${visual.icon}`}></i></div>
+              <h4>{visual.title}</h4>
+              <span>{visual.date}</span>
+            </VisualCard>
+          ))}
+        </VisualBoxContainer>
+      </VisualSection>
 
-      {/* 3. 프로젝트 카드 배치 보드 */}
+      {/* 2. 진행 중인 프로젝트 영역 */}
+      <SectionTitleRow>
+        <h3>진행 중인 프로젝트 <span style={{fontSize: '14px', color: '#94a3b8', fontWeight: '600', marginLeft: '8px'}}>({projects.length}/10)</span></h3>
+        <button type="button" className="primary-btn" onClick={handleAddProject}>+ 새 프로젝트...</button>
+      </SectionTitleRow>
       <ProjectGrid>
-        {/* 카드 1: 이미지 분류 */}
-        <ProjectCard>
-          <div className="tag">PDF x 3</div>
-          <h3>이미지 분류</h3>
-          <div className="date">최근 수정 2026.05.04</div>
-          
-          {/* 💡 [반영 포인트] 👤 이모지 제거 및 세팅된 원형 서클 아이콘 적용 */}
-          <div className="profile-thumbnail">
-            <i className="fa-regular fa-circle-user"></i>
-          </div>
-
-          <div className="card-footer">
-            <div className="meta-info">
-              <span><i className="fa-solid fa-users"></i> 개인</span>
-              <span><i className="fa-solid fa-box-archive"></i> 차트 2개</span>
+        {projects.map((project) => (
+          <ProjectCard key={project.id}>
+            <div className={`tag ${project.isHwp ? 'hwp' : ''}`}>{project.type}</div>
+            {editingProjectId === project.id ? (
+              <input type="text" className="title-input" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} onBlur={handleTitleSave} onKeyDown={handleKeyDown} autoFocus onClick={(e) => e.stopPropagation()} />
+            ) : ( <h3>{project.title}</h3> )}
+            <div className="date">최근 수정 {project.date}</div>
+            <div className="profile-thumbnail"><i className="fa-regular fa-circle-user"></i></div>
+            <div className="card-footer">
+              <div className="meta-info"><span><i className="fa-solid fa-user"></i> 개인</span> {project.charts > 0 && ( <span><i className="fa-solid fa-box-archive"></i> 차트 {project.charts}개</span> )}</div>
+              <div className="action-btns">
+                <button type="button" className="edit-icon-btn" onClick={(e) => handleEditClick(e, project)}><i className="fa-solid fa-pen"></i></button>
+                <button type="button" className="delete-icon-btn" onClick={(e) => handleDeleteProject(e, project.id)}><i className="fa-solid fa-trash"></i></button>
+              </div>
             </div>
-            <button type="button" className="edit-icon-btn" onClick={handlePreventAction}>
-              <i className="fa-solid fa-pen"></i>
-            </button>
-          </div>
-        </ProjectCard>
-
-        {/* 카드 2: 자연어 처리 */}
-        <ProjectCard>
-          <div className="tag hwp">hwp</div>
-          <h3>자연어 처리</h3>
-          <div className="date">최근 수정 2026.05.04</div>
-          
-          {/* 아바타 반영 */}
-          <div className="profile-thumbnail">
-            <i className="fa-regular fa-circle-user"></i>
-          </div>
-
-          <div className="card-footer">
-            <div className="meta-info">
-              <span><i className="fa-solid fa-user"></i> 개인</span>
-              <span><i className="fa-solid fa-book"></i> 차트 2개</span>
-            </div>
-            <button type="button" className="edit-icon-btn" onClick={handlePreventAction}>
-              <i className="fa-solid fa-pen"></i>
-            </button>
-          </div>
-        </ProjectCard>
-
-        {/* 카드 3: 논문 분석 처리 */}
-        <ProjectCard>
-          <div className="tag">PDF</div>
-          <h3>논문 분석 처리</h3>
-          <div className="date">최근 수정 2026.05.04</div>
-
-          {/* 아바타 반영 */}
-          <div className="profile-thumbnail">
-            <i className="fa-regular fa-circle-user"></i>
-          </div>
-
-          <div className="card-footer">
-            <div className="meta-info">
-              <span><i className="fa-solid fa-user-astronaut"></i> 개인</span>
-            </div>
-            <button type="button" className="edit-icon-btn" onClick={handlePreventAction}>
-              <i className="fa-solid fa-pen"></i>
-            </button>
-          </div>
-        </ProjectCard>
-
-        {/* 카드 4: 빈 슬롯 */}
-        <EmptyCard onClick={handlePreventAction}>
-          <span className="plus-icon">+</span>
-          <span>새 프로젝트 추가</span>
-        </EmptyCard>
-
-        {/* 카드 5: 빈 슬롯 */}
-        <EmptyCard onClick={handlePreventAction}>
-          <span className="plus-icon">+</span>
-          <span>새 프로젝트 추가</span>
-        </EmptyCard>
-
-        {/* 카드 6: 빈 슬롯 */}
-        <EmptyCard onClick={handlePreventAction}>
-          <span className="plus-icon">+</span>
-          <span>새 프로젝트 추가</span>
-        </EmptyCard>
+          </ProjectCard>
+        ))}
+        {projects.length < 10 && ( <EmptyCard onClick={handleAddProject}><span className="plus-icon">+</span><span>새 프로젝트 추가</span></EmptyCard> )}
       </ProjectGrid>
+
+      {/* ==========================================================================
+         🔓 3. 전체보기 모달 레이아웃 (이 안에서도 삭제 가능)
+         ========================================================================== */}
+      {isViewAllOpen && (
+        <ModalOverlay onClick={() => setIsViewAllOpen(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>모든 시각화 보관함 ({visuals.length}/10)</h3>
+              <button onClick={() => setIsViewAllOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+            </div>
+            <div className="modal-body">
+              {visuals.map((visual) => (
+                <VisualCard key={visual.id} onClick={() => setSelectedVisual(visual)}>
+                  {/* 💡 전체보기 모달 안에서도 삭제 기능 활성화 */}
+                  <button className="delete-visual-btn" onClick={(e) => handleDeleteVisual(e, visual.id)}>
+                    <i className="fa-solid fa-trash"></i>
+                  </button>
+                  <div className="mock-img"><i className={`fa-solid ${visual.icon}`}></i></div>
+                  <h4>{visual.title}</h4>
+                  <span>{visual.date}</span>
+                </VisualCard>
+              ))}
+            </div>
+          </ModalContent>
+        </ModalOverlay>
+      )}
+
+      {/* ==========================================================================
+         🔓 4. 사이드 드로어
+         ========================================================================== */}
+      <DrawerBackdrop $show={!!selectedVisual} onClick={() => setSelectedVisual(null)} />
+      <DrawerContainer $show={!!selectedVisual}>
+        {selectedVisual && (
+          <>
+            <div className="drawer-header">
+              <div className="title-wrap"><h3>{selectedVisual.title}</h3><span>저장 일자: {selectedVisual.date}</span></div>
+              <button type="button" className="close-btn" onClick={() => setSelectedVisual(null)}><i className="fa-solid fa-xmark"></i></button>
+            </div>
+            <div className="drawer-body">
+              <div className="visual-preview"><i className={`fa-solid ${selectedVisual.icon}`}></i></div>
+              <div className="info-section"><h5>데이터 분석 요약</h5><p>{selectedVisual.desc}</p></div>
+              <div className="info-section">
+                <h5>세부 정보 필드</h5>
+                <div className="details-list">
+                  {selectedVisual.details.map((item, idx) => (
+                    <div className="detail-item" key={idx}><span className="lbl">{item.lbl}</span><span className="val">{item.val}</span></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="drawer-footer">
+              {/* 💡 하단에 드로어 안에서도 해당 데이터 삭제할 수 있는 기능 연결 시도 가능 (현재는 다운로드 버튼) */}
+              <button type="button" className="action-btn">보고서 데이터 다운로드 (PNG)</button>
+            </div>
+          </>
+        )}
+      </DrawerContainer>
+
     </ProjectsContainer>
   );
 }

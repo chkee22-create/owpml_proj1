@@ -131,7 +131,7 @@ export const FigAuthBox = styled.div`
 /* ==========================================================================
    📦 2. 메인 컴포넌트 로직 (AuthModal Component)
    ========================================================================== */
-function AuthModal({ modalMode, setModalMode, formData, onInputChange, onLoginSubmit, onSignupSubmit }) {
+function AuthModal({ modalMode, setModalMode, formData, onInputChange, onLoginSubmit, onSignupSubmit, authError, authLoading }) {
   if (!modalMode) return null;
 
   return (
@@ -198,8 +198,11 @@ function AuthModal({ modalMode, setModalMode, formData, onInputChange, onLoginSu
               </div>
 
               <div className="action-row">
-                <button className="continue-btn" onClick={onLoginSubmit}>로그인</button>
+                <button className="continue-btn" onClick={onLoginSubmit} disabled={authLoading}>
+                  {authLoading ? '로그인 중...' : '로그인'}
+                </button>
               </div>
+              {authError && <p className="toggle-guide" style={{ color: palette.red[6], marginBottom: '12px' }}>{authError}</p>}
 
               <p className="toggle-guide">
                 계정이 없으신가요? 
@@ -233,8 +236,11 @@ function AuthModal({ modalMode, setModalMode, formData, onInputChange, onLoginSu
               </div>
 
               <div className="action-row">
-                <button className="continue-btn" onClick={onSignupSubmit}>가입하기</button>
+                <button className="continue-btn" onClick={onSignupSubmit} disabled={authLoading}>
+                  {authLoading ? '가입 중...' : '가입하기'}
+                </button>
               </div>
+              {authError && <p className="toggle-guide" style={{ color: palette.red[6], marginBottom: '12px' }}>{authError}</p>}
 
               <p className="toggle-guide">
                 이미 계정이 있으신가요? 

@@ -1,5 +1,16 @@
 import React from 'react';
 import styled from 'styled-components';
+import {
+  FiFolder,
+  FiChevronLeft,
+  FiMessageSquare,
+  FiPieChart,
+  FiSettings,
+  FiShare2,
+  FiUser,
+} from 'react-icons/fi';
+import { TbMessagePlus } from 'react-icons/tb';
+import { RiRobot2Line } from 'react-icons/ri';
 import { palette } from '../shared/palette';
 
 const SidebarContainer = styled.aside`
@@ -9,6 +20,8 @@ const SidebarContainer = styled.aside`
   display: flex; flex-direction: column; 
   padding: 28px 16px;                    /* 💡 상단 여백을 24px에서 28px로 살짝 넓혀 로고 안정감 확보 */
   box-sizing: border-box; justify-content: space-between; flex-shrink: 0;
+  transform: ${props => props.$collapsed ? 'translateX(-100%)' : 'translateX(0)'};
+  transition: transform 0.22s ease;
 `;
 
 const TopBrandSection = styled.div`
@@ -24,7 +37,7 @@ const TopBrandSection = styled.div`
     border-radius: 8px; color: white; 
     display: flex; align-items: center; justify-content: center;
     
-    .material-symbols-outlined { font-size: 20px; color: #ffffff; }
+    svg { width: 20px; height: 20px; color: #ffffff; }
   }
   
   /* 🎨 브랜드 서비스명 타이틀 텍스트 */
@@ -51,24 +64,52 @@ const NavList = styled.nav`
   }
 `;
 
-/* 🎨 구글 머티리얼 심볼 전용 컴포넌트 (정석 문법) */
-const MaterialIcon = styled.span.attrs({ className: 'material-symbols-outlined' })`
-  font-family: 'Material Symbols Outlined' !important;
-  font-weight: normal;
-  font-style: normal;
-  font-size: 18px;                        /* 글자 크기 밸런스 매칭 */
-  line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
-  display: inline-block;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  -webkit-font-smoothing: antialiased;
-  
+const NavIcon = styled.span`
   width: 20px;
-  text-align: center;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: ${props => props.$active ? '#0ea5a4' : palette.slate[5]};
   transition: color 0.15s;
+
+  svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.2;
+  }
+`;
+
+const BrandRow = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+`;
+
+const CollapseButton = styled.button`
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #ffffff;
+    color: #0ea5a4;
+  }
+
+  svg {
+    width: 17px;
+    height: 17px;
+  }
 `;
 
 const MenuBtn = styled.div`
@@ -90,13 +131,13 @@ const MenuBtn = styled.div`
     background: ${props => props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.4)'}; /* 선택 안 된 메뉴 호버 시 투명하게 동화 */
     color: #0ea5a4; 
     
-    ${MaterialIcon} {
+    ${NavIcon} {
       color: #0ea5a4;
     }
   }
   
   /* 메뉴명 좌측에 들어가는 정렬용 아이콘 정밀 세팅 */
-  ${MaterialIcon} { 
+  ${NavIcon} { 
     color: ${props => props.$active ? '#0ea5a4' : palette.slate[5]}; 
   }
   
@@ -120,7 +161,7 @@ const BottomUserCard = styled.div`
     background: rgba(255, 255, 255, 0.5); /* 💡 사이드바 연초록 배경에 착 붙는 반투명 화이트 가이드 적용 */
     border-color: rgba(255, 255, 255, 0.6);
     
-    ${MaterialIcon}.account-icon {
+    .account-icon {
       color: ${palette.slate[7]};         /* 호버 시 실루엣 아이콘 톤 다운 피드백 */
     }
   }
@@ -131,9 +172,9 @@ const BottomUserCard = styled.div`
     border-radius: 50%; 
     display: flex; align-items: center; justify-content: center; 
     
-    ${MaterialIcon}.account-icon {
-      font-size: 32px;                   /* 원 크기에 딱 맞춤 */
+    .account-icon {
       width: 32px;
+      height: 32px;
       color: ${palette.slate[5]};         /* 피그마 시안의 그레이 실루엣 컬러 매칭 */
     }
   }
@@ -150,58 +191,68 @@ const BottomUserCard = styled.div`
   }
   
   /* 유저네임 우측 설정 아이콘 등 */
-  ${MaterialIcon}.gear-icon { 
+  .gear-icon { 
     color: #546e7a; 
-    font-size: 16px; 
+    width: 16px;
+    height: 16px;
   }
 `;
 
-function Sidebar({ viewMode, onMenuClick, onLogoClick, isLoggedIn, username, onProfileClick }) {
+function SidebarIcon({ active, children }) {
+  return <NavIcon $active={active}>{children}</NavIcon>;
+}
+
+function Sidebar({ viewMode, onMenuClick, onLogoClick, isLoggedIn, username, onProfileClick, collapsed, onCollapse }) {
   return (
-    <SidebarContainer>
+    <SidebarContainer $collapsed={collapsed}>
       <div style={{display:'flex', flexDirection:'column', width:'100%'}}>
         {/* 💡 로고 바운더리 클릭 시 홈 대시보드로 복귀 */}
-        <TopBrandSection onClick={onLogoClick}>
-          <div className="logo">
-            <MaterialIcon>smart_toy</MaterialIcon>
-          </div>
-          <div className="brand-text"><span>ChatBot AI</span>Paper Mate</div>
-        </TopBrandSection>
+        <BrandRow>
+          <TopBrandSection onClick={onLogoClick}>
+            <div className="logo">
+              <RiRobot2Line />
+            </div>
+            <div className="brand-text"><span>ChatBot AI</span>PaperMate</div>
+          </TopBrandSection>
+          <CollapseButton type="button" onClick={onCollapse} aria-label="사이드바 숨기기">
+            <FiChevronLeft />
+          </CollapseButton>
+        </BrandRow>
 
         <NavList>
           {/* 새 채팅 버튼 */}
           <MenuBtn $active={viewMode === 'main'} onClick={() => onMenuClick('새 채팅')}>
-            <MaterialIcon>chat_dashed</MaterialIcon>
-            <span className="menu-text">새 채팅</span>
+            <SidebarIcon active={viewMode === 'main'}><TbMessagePlus /></SidebarIcon>
+            <span className="menu-text">새로운 채팅</span>
           </MenuBtn>
           
           <div className="section-lbl">최근 대화</div>
           <MenuBtn $active={false}>
-            <MaterialIcon>chat_bubble</MaterialIcon>
+            <SidebarIcon><FiMessageSquare /></SidebarIcon>
             <span className="menu-text">Rag란 무엇인가</span>
           </MenuBtn>
           <MenuBtn $active={false}>
-            <MaterialIcon>chat_bubble</MaterialIcon>
+            <SidebarIcon><FiMessageSquare /></SidebarIcon>
             <span className="menu-text">비교분석</span>
           </MenuBtn>
           <MenuBtn $active={false}>
-            <MaterialIcon>chat_bubble</MaterialIcon>
+            <SidebarIcon><FiMessageSquare /></SidebarIcon>
             <span className="menu-text">LLM이란 무엇인가</span>
           </MenuBtn>
 
           <div style={{height:'1px', background:'rgba(15, 23, 42, 0.08)', margin:'16px 0'}} />
 
-          <MenuBtn $active={viewMode === '공유'} onClick={() => onMenuClick('공유')}>
-            <MaterialIcon>share</MaterialIcon>
-            <span className="menu-text">공유</span>
-          </MenuBtn>
           <MenuBtn $active={viewMode === '분석 비교'} onClick={() => onMenuClick('분석 비교')}>
-            <MaterialIcon>pie_chart</MaterialIcon>
-            <span className="menu-text">분석 비교</span>
+            <SidebarIcon active={viewMode === '분석 비교'}><FiPieChart /></SidebarIcon>
+            <span className="menu-text">분석.요약</span>
           </MenuBtn>
           <MenuBtn $active={viewMode === '내 프로젝트'} onClick={() => onMenuClick('내 프로젝트')}>
-            <MaterialIcon>folder_open</MaterialIcon>
-            <span className="menu-text">내 프로젝트</span>
+            <SidebarIcon active={viewMode === '내 프로젝트'}><FiFolder /></SidebarIcon>
+            <span className="menu-text">프로젝트</span>
+          </MenuBtn>
+          <MenuBtn $active={viewMode === '공유'} onClick={() => onMenuClick('공유')}>
+            <SidebarIcon active={viewMode === '공유'}><FiShare2 /></SidebarIcon>
+            <span className="menu-text">함께하는 공간</span>
           </MenuBtn>
         </NavList>
       </div>
@@ -209,10 +260,10 @@ function Sidebar({ viewMode, onMenuClick, onLogoClick, isLoggedIn, username, onP
       {isLoggedIn && (
         <BottomUserCard onClick={onProfileClick}>
           <div className="profile-circle">
-            <MaterialIcon className="account-icon">account_circle</MaterialIcon>
+            <FiUser className="account-icon" />
           </div>
           <div className="name">{username}</div>
-          <MaterialIcon className="gear-icon">settings</MaterialIcon>
+          <FiSettings className="gear-icon" />
         </BottomUserCard>
       )}
     </SidebarContainer>

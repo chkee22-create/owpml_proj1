@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Sidebar from '../components/Sidebar';
 import { palette } from '../shared/palette';
+import { FiChevronRight } from 'react-icons/fi';
 
 /* ── 💡 외부로 분리한 AuthModal 컴포넌트 임포트 ── */
 import AuthModal from '../components/AuthModal';
@@ -12,8 +13,46 @@ import ShareC from './Share';
 import AnalysisC from './Analysis'; 
 import Project from './Project';  
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+
 const Container = styled.div`
   display: flex; width: 100%; height: 100vh; width: 100vw; overflow: hidden; box-sizing: border-box;
+`;
+
+const SidebarSlot = styled.div`
+  width: ${props => props.$collapsed ? '0px' : '260px'};
+  height: 100vh;
+  flex-shrink: 0;
+  overflow: visible;
+  transition: width 0.22s ease;
+`;
+
+const SidebarOpenButton = styled.button`
+  position: fixed;
+  top: 18px;
+  left: 12px;
+  z-index: 30;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  display: ${props => props.$visible ? 'inline-flex' : 'none'};
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+
+  &:hover {
+    color: #0ea5a4;
+    border-color: #94a3b8;
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
 `;
 
 /* ── 1. 메인 뷰포트 레이아웃 ── */
@@ -21,7 +60,12 @@ const MainContent = styled.main`
   flex: 1; display: flex; flex-direction: column; 
   background: #f9fbe7;      /* 💡 기본 베이스 미색 */
   padding: ${props => props.$isFullView ? '0px' : '24px 40px'}; 
+  padding-left: ${props => {
+    if (!props.$sidebarCollapsed) return props.$isFullView ? '0px' : '40px';
+    return props.$isFullView ? '34px' : '68px';
+  }};
   box-sizing: border-box; height: 100vh; overflow: hidden; position: relative;
+  transition: padding-left 0.22s ease;
 `;
 
 /* 우측 최상단 비로그인 상태의 로그인/회원가입 내비 링크 */
@@ -120,16 +164,15 @@ function Home() {
   const [username, setUsername] = useState('user14530');
   const [viewMode, setViewMode] = useState('main'); 
   const [restoredData, setRestoredData] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [formData, setFormData] = useState({ id: '', pw: '', confirmPw: '' });
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
   
   /* ── 💡 분리된 AuthModal을 하나로 제어하기 위한 단일 상태 관리 모드 ── */
   const [modalMode, setModalMode] = useState(null); // 'recommend', 'login', 'signup', null
 
   useEffect(() => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';
-    document.head.appendChild(link);
-    
     const savedLoginStatus = localStorage.getItem('isLoggedIn');
     const savedUsername = localStorage.getItem('username');
     if (savedLoginStatus === 'true') {
@@ -137,6 +180,12 @@ function Home() {
       if (savedUsername) setUsername(savedUsername);
     }
   }, []);
+
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setAuthError('');
+  };
 
   const handleMenuRouting = (menuName) => {
     const protectedMenus = ['공유', '분석 비교', '내 프로젝트', '마이페이지', '프로필클릭'];
@@ -153,18 +202,67 @@ function Home() {
     else if (menuName === '새 채팅') { setViewMode('main'); setRestoredData(null); }
   };
 
-  const openLoginPopup = () => setModalMode('login');
-  const openSignupPopup = () => setModalMode('signup');
+  const openLoginPopup = () => {
+    setAuthError('');
+    setModalMode('login');
+  };
+  const openSignupPopup = () => {
+    setAuthError('');
+    setModalMode('signup');
+  };
 
-  const handleAuthSuccess = () => {
+  const handleAuthSuccess = (authPayload) => {
     setIsLoggedIn(true);
+    setUsername(authPayload.user.username);
     localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('username', authPayload.user.username);
+    localStorage.setItem('accessToken', authPayload.access_token);
     setModalMode(null);
+    setFormData({ id: '', pw: '', confirmPw: '' });
+    setAuthError('');
+  };
+
+  const submitAuthRequest = async (mode) => {
+    const usernameInput = formData.id.trim();
+    const passwordInput = formData.pw;
+
+    if (!usernameInput || !passwordInput) {
+      setAuthError('아이디와 비밀번호를 입력해주세요.');
+      return;
+    }
+
+    if (mode === 'signup' && passwordInput !== formData.confirmPw) {
+      setAuthError('비밀번호 확인이 일치하지 않습니다.');
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthError('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/${mode}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: usernameInput, password: passwordInput }),
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.detail || '인증 요청에 실패했습니다.');
+      }
+
+      handleAuthSuccess(data);
+    } catch (error) {
+      setAuthError(error.message || '서버와 연결할 수 없습니다.');
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const handleAbsoluteLogout = () => {
     setIsLoggedIn(false);
     localStorage.setItem('isLoggedIn', 'false');
+    localStorage.removeItem('accessToken');
     setViewMode('main'); 
   };
 
@@ -181,16 +279,29 @@ function Home() {
 
   return (
     <Container>
-      <Sidebar 
-        viewMode={viewMode}
-        onMenuClick={handleMenuRouting}
-        onLogoClick={() => { setViewMode('main'); setRestoredData(null); }}
-        isLoggedIn={isLoggedIn}
-        username={username}
-        onProfileClick={() => handleMenuRouting('프로필클릭')} 
-      />
+      <SidebarOpenButton
+        type="button"
+        $visible={isSidebarCollapsed}
+        onClick={() => setIsSidebarCollapsed(false)}
+        aria-label="사이드바 열기"
+      >
+        <FiChevronRight />
+      </SidebarOpenButton>
 
-      <MainContent $isFullView={isFullView}>
+      <SidebarSlot $collapsed={isSidebarCollapsed}>
+        <Sidebar 
+          viewMode={viewMode}
+          onMenuClick={handleMenuRouting}
+          onLogoClick={() => { setViewMode('main'); setRestoredData(null); }}
+          isLoggedIn={isLoggedIn}
+          username={username}
+          onProfileClick={() => handleMenuRouting('프로필클릭')} 
+          collapsed={isSidebarCollapsed}
+          onCollapse={() => setIsSidebarCollapsed(true)}
+        />
+      </SidebarSlot>
+
+      <MainContent $isFullView={isFullView} $sidebarCollapsed={isSidebarCollapsed}>
         
         {/* ❌ 중복되었던 대량의 모달 마크업들(RecommendBox, FigAuthBox 렌더링 블록)을 
              여기가 아니라 하단 <AuthModal /> 하나로 통합하여 깔끔하게 제거했습니다. */}
@@ -247,17 +358,19 @@ function Home() {
         
         {viewMode === '내 프로젝트' && <Project />}
         {viewMode === '마이페이지' && <MypageC onLogoutClick={handleAbsoluteLogout} />}
-        {viewMode === '공유' && <ShareC onRestoreTrigger={handleTimelineRestoreJump} />}
+        {viewMode === '공유' && <ShareC onRestoreTrigger={handleTimelineRestoreJump} username={username} />}
         {viewMode === '분석 비교' && <AnalysisC restoredData={restoredData} clearRestore={() => setRestoredData(null)} />}
         
         {/* ── 💡 분리된 모달을 한 곳에 주입하여 깔끔하게 통합 ── */}
         <AuthModal 
           modalMode={modalMode} 
           setModalMode={setModalMode} 
-          formData={{ id: '', pw: '', confirmPw: '' }} // 추후 필요 시 확장
-          onInputChange={() => {}}
-          onLoginSubmit={handleAuthSuccess} 
-          onSignupSubmit={() => setModalMode('login')} 
+          formData={formData}
+          onInputChange={handleInputChange}
+          onLoginSubmit={() => submitAuthRequest('login')} 
+          onSignupSubmit={() => submitAuthRequest('signup')} 
+          authError={authError}
+          authLoading={authLoading}
         />
       </MainContent>
     </Container>

@@ -1,13 +1,17 @@
-/* 전역 스타일 초기화 - 스크롤바 절대 방지 */
-* {
-  box-sizing: border-box !important;
-  margin: 0 !important;
-  padding: 0 !important;
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+/* 전역 스타일 초기화 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 html, body, #root, .App {
-  width: 100vw !important;
-  height: 100vh !important;
-  overflow: hidden !important; /* 브라우저 창 자체의 스크롤을 완전히 차단 */
+  min-height: 100vh;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden; /* 가로 스크롤만 숨김 */
   background-color: #f8fafc;
 }
