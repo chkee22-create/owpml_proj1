@@ -155,17 +155,7 @@ const BottomUserCard = styled.div`
   border-radius: 10px; cursor: pointer; transition: all 0.15s; margin-top: auto;
   border: 1px solid transparent;        /* 💡 호버 시 깜빡임(털컥거림) 방지용 투명 테두리 */
   box-sizing: border-box;
-  
-  /* 🎨 하단 프로필 카드 마우스 오버 시 입체 가이드 */
-  &:hover { 
-    background: rgba(255, 255, 255, 0.5); /* 💡 사이드바 연초록 배경에 착 붙는 반투명 화이트 가이드 적용 */
-    border-color: rgba(255, 255, 255, 0.6);
-    
-    .account-icon {
-      color: ${palette.slate[7]};         /* 호버 시 실루엣 아이콘 톤 다운 피드백 */
-    }
-  }
-  
+
   /* 🎨 유저 프로필 원형 아바타 영역 */
   .profile-circle { 
     width: 32px; height: 32px; 
@@ -208,7 +198,7 @@ function Sidebar({
   onLogoClick,
   isLoggedIn,
   username,
-  onProfileClick,
+  onProfileClick, // 이 함수가 마이페이지로 이동시키는 함수라고 가정합니다
   collapsed,
   onCollapse,
   recentConversations = [],
@@ -217,12 +207,10 @@ function Sidebar({
   return (
     <SidebarContainer $collapsed={collapsed}>
       <div style={{display:'flex', flexDirection:'column', width:'100%'}}>
-        {/* 💡 로고 바운더리 클릭 시 홈 대시보드로 복귀 */}
+        {/* ... 로고 및 내비게이션 메뉴 영역 (동일) ... */}
         <BrandRow>
           <TopBrandSection onClick={onLogoClick}>
-            <div className="logo">
-              <RiRobot2Line />
-            </div>
+            <div className="logo"><RiRobot2Line /></div>
             <div className="brand-text"><span>ChatBot AI</span>PaperMate</div>
           </TopBrandSection>
           <CollapseButton type="button" onClick={onCollapse} aria-label="사이드바 숨기기">
@@ -231,12 +219,11 @@ function Sidebar({
         </BrandRow>
 
         <NavList>
-          {/* 새 채팅 버튼 */}
           <MenuBtn $active={viewMode === 'main'} onClick={() => onMenuClick('새 채팅')}>
             <SidebarIcon active={viewMode === 'main'}><TbMessagePlus /></SidebarIcon>
             <span className="menu-text">새로운 채팅</span>
           </MenuBtn>
-          
+          {/* ... 최근 대화 및 기타 메뉴 동일 ... */}
           {isLoggedIn && (
             <>
               <div className="section-lbl">최근 대화</div>
@@ -247,20 +234,14 @@ function Sidebar({
                 </MenuBtn>
               )}
               {recentConversations.map((conversation) => (
-                <MenuBtn
-                  key={conversation.id}
-                  $active={false}
-                  onClick={() => onRecentConversationClick?.(conversation)}
-                >
+                <MenuBtn key={conversation.id} $active={false} onClick={() => onRecentConversationClick?.(conversation)}>
                   <SidebarIcon><FiMessageSquare /></SidebarIcon>
                   <span className="menu-text">{conversation.title}</span>
                 </MenuBtn>
               ))}
             </>
           )}
-
           <div style={{height:'1px', background:'rgba(15, 23, 42, 0.08)', margin:'16px 0'}} />
-
           <MenuBtn $active={viewMode === '분석 비교'} onClick={() => onMenuClick('분석 비교')}>
             <SidebarIcon active={viewMode === '분석 비교'}><FiPieChart /></SidebarIcon>
             <span className="menu-text">분석.요약</span>
@@ -277,12 +258,17 @@ function Sidebar({
       </div>
 
       {isLoggedIn && (
-        <BottomUserCard onClick={onProfileClick}>
+        <BottomUserCard> {/* 💡 여기서 onClick 제거 */}
           <div className="profile-circle">
             <FiUser className="account-icon" />
           </div>
           <div className="name">{username}</div>
-          <FiSettings className="gear-icon" />
+          {/* 💡 톱니바퀴 아이콘에만 이벤트 연결 */}
+          <FiSettings 
+            className="gear-icon" 
+            onClick={onProfileClick} 
+            style={{ cursor: 'pointer' }} 
+          />
         </BottomUserCard>
       )}
     </SidebarContainer>

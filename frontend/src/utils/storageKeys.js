@@ -10,9 +10,7 @@ export const SHARED_ROOM_PREFIX = 'papermate.sharedRoom.v1';
 // userId 또는 username을 키 뒤에 붙여서 계정별 저장 공간을 분리합니다.
 // 예: papermate.projects.v1.3, papermate.projects.v1.user14530
 const getUserScope = () => {
-  const userId = localStorage.getItem('userId');
-  const username = localStorage.getItem('username');
-  return encodeURIComponent(userId || username || 'guest');
+  return 'test-everyone';
 };
 
 export const scopedKey = (baseKey) => `${baseKey}.${getUserScope()}`;
@@ -73,6 +71,7 @@ const mergeProjectsIntoSharedIndex = (projects) => {
 
 // 예전 버전에서 저장한 키를 현재 로그인 계정의 새 키로 한 번만 옮깁니다.
 // 이미 다른 계정으로 이전된 데이터는 다시 복사하지 않도록 migratedTo 표시를 남깁니다.
+// TODO: 배포 전에는 반드시 계정별 스코프(getUserScope)로 복구할 것!
 const migrateJsonIfTargetEmpty = (sourceKey, targetKey, fallback) => {
   if (sourceKey === targetKey) return;
 

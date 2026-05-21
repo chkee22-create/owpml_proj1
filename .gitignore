@@ -194,4 +194,6 @@ node_modules/
 # Database
 *.db
 *.sqlite
+.env
+Analysis.js
 # ----------------------------------------------------------------

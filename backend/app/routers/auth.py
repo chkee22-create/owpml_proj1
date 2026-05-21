@@ -3,17 +3,15 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status
 from pymongo.errors import DuplicateKeyError
 
-from ..database import db
-from ..schemas import AuthResponse, AuthUser, LoginRequest, SignupRequest
-from ..security import create_access_token, hash_password, verify_password
-
+# 수정된 경로에 따른 import 최적화
+from app.core.database import db
+from app.core.security import create_access_token, hash_password, verify_password
+from models.schemas import AuthResponse, AuthUser, LoginRequest, SignupRequest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-
 def serialize_user(user) -> AuthUser:
     return AuthUser(id=str(user["_id"]), username=user["username"])
-
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def signup(payload: SignupRequest):
@@ -35,7 +33,6 @@ async def signup(payload: SignupRequest):
     user_doc["_id"] = result.inserted_id
     token = create_access_token(str(result.inserted_id))
     return AuthResponse(access_token=token, user=serialize_user(user_doc))
-
 
 @router.post("/login", response_model=AuthResponse)
 async def login(payload: LoginRequest):
