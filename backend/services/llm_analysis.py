@@ -40,10 +40,10 @@ def _build_document_context(extracted_docs: list[dict]) -> str:
 # 반환값:
 # - 성공: {"answer": "...", "llm_used": True, "model": "..."}
 # - 실패/키 없음: None
-def analyze_with_llm(question: str, extracted_docs: list[dict]) -> dict | None:
+def analyze_with_llm(question: str, extracted_docs: list[dict], api_key_override: str | None = None) -> dict | None:
     # OPENAI_API_KEY는 운영체제 환경변수입니다.
     # PowerShell 예: $env:OPENAI_API_KEY="sk-..."
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = api_key_override or os.getenv("OPENAI_API_KEY")
     if not api_key:
         return None
 

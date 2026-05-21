@@ -168,7 +168,53 @@ export const TopMenuBar = styled.div`
   
   /* 우측 액션 버튼 군 (프로젝트 저장, 내보내기 등) */
   .actions { 
-    display: flex; gap: 8px; 
+    display: flex; gap: 8px; align-items: center;
+
+    .api-key-box {
+      height: 36px;
+      min-width: 230px;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      background: #f8fbff;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 9px;
+      box-sizing: border-box;
+
+      i {
+        color: #2563eb;
+        font-size: 12px;
+      }
+
+      input {
+        min-width: 0;
+        flex: 1;
+        border: none;
+        background: transparent;
+        outline: none;
+        color: #1e293b;
+        font-size: 12px;
+        font-weight: 750;
+
+        &::placeholder {
+          color: #94a3b8;
+        }
+      }
+
+      .clear-key {
+        width: 20px;
+        height: 20px;
+        border: none;
+        border-radius: 5px;
+        background: #dbeafe;
+        color: #2563eb;
+        padding: 0;
+        font-size: 13px;
+        line-height: 1;
+      }
+    }
+
     button { 
       background: #ffffff;              /* 💡 버튼 배경을 흰색으로 전환하여 더 정갈하게 변경 */
       border: 1px solid #cbd5e1; 
@@ -198,6 +244,10 @@ export const TopMenuBar = styled.div`
       button {
         flex: 1;
         min-width: 120px;
+      }
+
+      .api-key-box {
+        width: 100%;
       }
     }
   }

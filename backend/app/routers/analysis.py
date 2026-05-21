@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 @router.post("/chat")
 async def analyze_chat(
     question: str = Form(""),
+    openai_api_key: str = Form(""),
     files: list[UploadFile] = File(default=[]),
 ):
     if not files:
@@ -43,7 +44,7 @@ async def analyze_chat(
 
     # analyze_with_llm은 OPENAI_API_KEY가 있을 때만 OpenAI API를 호출합니다.
     # 키가 없거나 호출 실패 시 None을 반환하고, fallback_answer만 프론트에 보냅니다.
-    llm_answer = analyze_with_llm(question, extracted_docs)
+    llm_answer = analyze_with_llm(question, extracted_docs, openai_api_key.strip() or None)
     if not llm_answer:
         return {
             **fallback_answer,

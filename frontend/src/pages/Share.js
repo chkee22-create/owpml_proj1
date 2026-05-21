@@ -29,6 +29,8 @@ import { getSharedImage, putSharedImage } from '../utils/imageStore';
 // 프로젝트를 고르는 화면이 아니라, 초대코드로 들어온 프로젝트 결과물을 보며 코멘트를 남기는 저장형 토론방입니다.
 // 실시간 소켓 채팅은 아니고 localStorage에 프로젝트별 코멘트를 저장해 같은 초대코드 참여자가 다시 읽는 구조입니다.
 
+// 과거 테스트용 더미 프로젝트 ID를 필터링하기 위한 목록입니다.
+// 공유 저장소나 로컬 저장소에서 불필요한 테스트 데이터를 제외합니다.
 const legacyDummyProjectIds = new Set([
   1,
   2,
@@ -38,6 +40,7 @@ const legacyDummyProjectIds = new Set([
   ['paper', 'analysis'].join('-'),
 ]);
 
+// 공유 토론방에 필요한 기본 상태 구조입니다.
 const fallbackRoom = {
   inviteCode: '',
   joinedCode: '',
@@ -49,9 +52,12 @@ const fallbackRoom = {
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
+// 로컬/공유 프로젝트 목록에서 유효한 프로젝트만 남깁니다.
 const sanitizeProjects = (projects) =>
   asArray(projects).filter((project) => project && !legacyDummyProjectIds.has(project.id));
 
+// 저장된 공유 방 데이터를 안전한 형태로 변환합니다.
+// 잘못된 값이나 레거시 더미 데이터를 제거합니다.
 const sanitizeRoom = (room = fallbackRoom) => ({
   ...fallbackRoom,
   ...(room && typeof room === 'object' ? room : {}),
@@ -74,11 +80,13 @@ const formatTime = () => {
 
 const formatDate = () => new Date().toLocaleDateString('ko-KR').replace(/. /g, '.').slice(0, -1);
 
+// 화면에서 사용할 초대코드를 생성합니다.
 const createInviteCode = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return Array.from({ length: 7 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 };
 
+// 업로드된 이미지를 data URL로 변환합니다.
 const readFileAsDataUrl = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -87,6 +95,7 @@ const readFileAsDataUrl = (file) =>
     reader.readAsDataURL(file);
   });
 
+// 공유 저장소에 저장할 때 이미지 데이터 URL은 제거하고 hasImage 정보만 남깁니다.
 const stripImageDataUrls = (project) => ({
   ...project,
   discussionImages: asArray(project.discussionImages).map(({ dataUrl, ...image }) => ({
@@ -95,6 +104,7 @@ const stripImageDataUrls = (project) => ({
   })),
 });
 
+// 프로젝트 소유자를 여러 후보에서 차례로 찾습니다.
 const getProjectOwner = (project, room) =>
   project?.owner ||
   asArray(project?.sourceProjects)[0]?.owner ||
@@ -108,16 +118,19 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
   const assetStartRef = useRef(null);
   const shouldScrollToAssetsRef = useRef(false);
 
+  // 로컬 저장소에서 사용자의 프로젝트 목록을 불러옵니다.
   const loadOwnProjects = () => {
     const saved = readJson(getProjectsKey(), []);
     return Array.isArray(saved) ? sanitizeProjects(saved) : [];
   };
 
+  // 다른 사용자가 공유한 프로젝트 목록을 불러옵니다.
   const loadSharedProjects = () => {
     const saved = readJson(SHARED_PROJECTS_KEY, []);
     return Array.isArray(saved) ? sanitizeProjects(saved) : [];
   };
 
+  // 마지막으로 사용 중이던 공유 토론방 정보를 로드합니다.
   const loadLastRoom = () => {
     const scopedRoom = sanitizeRoom(readJson(getShareRoomKey(), fallbackRoom));
     const lastCode = scopedRoom.inviteCode || scopedRoom.joinedCode;
@@ -137,6 +150,8 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
   const [notice, setNotice] = useState('');
   const [imageDataUrls, setImageDataUrls] = useState({});
 
+  // 로컬 프로젝트와 공유 프로젝트를 합쳐서 하나의 프로젝트 목록으로 만듭니다.
+  // 공유본의 이미지를 항상 우선으로 반영합니다.
   const allProjects = useMemo(() => {
     const mergedProjects = new Map();
 
@@ -293,6 +308,8 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
     return updatedProject;
   };
 
+  // room 상태가 변경될 때 로컬 저장소에도 업데이트합니다.
+  // 활성 초대코드가 있으면 공유 방과 일반 방 둘 다 동기화합니다.
   useEffect(() => {
     const roomKey = activeShareCode ? getSharedRoomKey(activeShareCode) : getShareRoomKey();
     const nextRoom = {
@@ -312,6 +329,7 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
     }
   }, [room, activeShareCode]);
 
+  // 다른 탭이나 저장소 이벤트로 프로젝트/공유 방 정보가 바뀌면 동기화합니다.
   useEffect(() => {
     const syncProjects = (event) => {
       const activeRoomKey = activeShareCode ? getSharedRoomKey(activeShareCode) : getShareRoomKey();
@@ -331,6 +349,7 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
     };
   }, [activeShareCode]);
 
+  // 사용자 이름이나 공유 코드가 바뀌면 최신 프로젝트/방 데이터를 다시 로드합니다.
   useEffect(() => {
     setProjects(loadOwnProjects());
     setSharedProjects(loadSharedProjects());
@@ -789,6 +808,7 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
     );
   };
 
+  // 페이지 전체 레이아웃: 왼쪽은 프로젝트 토론 자료, 오른쪽은 초대코드 및 댓글 입력 패널.
   return (
     <Container>
       <MainTimelineContent>
