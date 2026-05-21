@@ -302,7 +302,9 @@ function AnalysisC({ projectId, projectTitle, restoredData }) {
         { id: Date.now() + 1, role: 'ai', text: `${response.data.answer}${sourceLabel}` },
       ]);
     } catch (error) {
-      const message = error.response?.data?.detail || '분석 서버와 연결할 수 없습니다. 백엔드를 실행한 뒤 다시 시도해주세요.';
+      const message =
+        error.response?.data?.detail ||
+        '분석 서버와 연결할 수 없습니다. 백엔드를 실행한 뒤 다시 시도해주세요.';
       setMessages((prev) => [...prev, { id: Date.now() + 1, role: 'ai', text: message }]);
     } finally {
       setIsAnalyzing(false);
@@ -314,8 +316,8 @@ function AnalysisC({ projectId, projectTitle, restoredData }) {
       id: Date.now(),
       role: 'asset',
       kind: type,
-      title: type === 'table' ? '분석 결과 비교 표' : '정확도 성능 비교 그래프',
-      text: 'AI가 분석한 논문별 주요 데이터를 시각화했습니다.',
+      title: type === 'table' ? '분석 결과 비교 표' : '정확도/성능 비교 그래프',
+      text: 'AI가 분석한 질문별 주요 데이터를 시각화했습니다.',
     };
     setMessages((prev) => [...prev, newAsset]);
   };
@@ -328,7 +330,7 @@ function AnalysisC({ projectId, projectTitle, restoredData }) {
       restoredData?.projectTitle ||
       files[0]?.name?.replace(/\.[^.]+$/, '') ||
       '새 분석 프로젝트';
-    const title = window.prompt('프로젝트명을 입력하세요.', defaultTitle);
+    const title = window.prompt('프로젝트명을 입력하세요', defaultTitle);
     if (!title?.trim()) return;
 
     const projectsKey = getProjectsKey();
@@ -377,20 +379,28 @@ function AnalysisC({ projectId, projectTitle, restoredData }) {
     setIsSavingProject(true);
     try {
       writeJson(projectsKey, nextProjects);
-      writeJson(recentConversationsKey, [
-        nextRecent,
-        ...(Array.isArray(savedRecents)
-          ? savedRecents.filter((item) => item.projectId !== projectRecord.id && item.id !== projectRecord.id)
-          : []),
-      ].slice(0, 3));
+      writeJson(
+        recentConversationsKey,
+        [
+          nextRecent,
+          ...(Array.isArray(savedRecents)
+            ? savedRecents.filter((item) => item.projectId !== projectRecord.id && item.id !== projectRecord.id)
+            : []),
+        ].slice(0, 3),
+      );
 
       const sharedProjects = readJson(SHARED_PROJECTS_KEY, []);
-      writeJson(SHARED_PROJECTS_KEY, [
-        projectRecord,
-        ...(Array.isArray(sharedProjects)
-          ? sharedProjects.filter((project) => project.id !== projectRecord.id && project.inviteCode !== projectRecord.inviteCode)
-          : []),
-      ].slice(0, 100));
+      writeJson(
+        SHARED_PROJECTS_KEY,
+        [
+          projectRecord,
+          ...(Array.isArray(sharedProjects)
+            ? sharedProjects.filter(
+                (project) => project.id !== projectRecord.id && project.inviteCode !== projectRecord.inviteCode,
+              )
+            : []),
+        ].slice(0, 100),
+      );
 
       try {
         await projectAPI.save(projectRecord);
@@ -435,10 +445,16 @@ function AnalysisC({ projectId, projectTitle, restoredData }) {
       <MainLayout>
         <VisualPanel>
           <div className="title">시각화 보관함</div>
-          <button className="action-btn" type="button" onClick={() => handleCreateVisual('table')}>표 그리기</button>
-          <button className="action-btn" type="button" onClick={() => handleCreateVisual('graph')}>그래프 그리기</button>
+          <button className="action-btn" type="button" onClick={() => handleCreateVisual('table')}>
+            표 그리기
+          </button>
+          <button className="action-btn" type="button" onClick={() => handleCreateVisual('graph')}>
+            그래프 그리기
+          </button>
           {visuals.map((visual, index) => (
-            <div key={`${visual.id}-${index}`} className="asset-item">저장됨 {visual.title}</div>
+            <div key={`${visual.id}-${index}`} className="asset-item">
+              저장됨 {visual.title}
+            </div>
           ))}
         </VisualPanel>
 
@@ -455,13 +471,17 @@ function AnalysisC({ projectId, projectTitle, restoredData }) {
                   autoComplete="off"
                 />
                 {openaiApiKey && (
-                  <button type="button" onClick={clearOpenaiApiKey} aria-label="API 키 지우기">x</button>
+                  <button type="button" onClick={clearOpenaiApiKey} aria-label="API 키 지우기">
+                    x
+                  </button>
                 )}
               </ApiKeyBox>
               <button type="button" onClick={handleSaveAnalysisProject} disabled={isSavingProject}>
                 {isSavingProject ? '저장 중...' : '프로젝트 저장'}
               </button>
-              <button type="button" onClick={() => fileInputRef.current?.click()}>파일 업로드</button>
+              <button type="button" onClick={() => fileInputRef.current?.click()}>
+                파일 업로드
+              </button>
             </div>
           </TopMenuBar>
 
@@ -469,14 +489,24 @@ function AnalysisC({ projectId, projectTitle, restoredData }) {
             {messages.map((message) => (
               <div key={message.id}>
                 {message.role === 'ai' ? (
-                  <AiRow><div className="ai-box">{message.text}</div></AiRow>
+                  <AiRow>
+                    <div className="ai-box">{message.text}</div>
+                  </AiRow>
                 ) : message.role === 'user' ? (
-                  <UserRow><div className="user-box">{message.text}</div></UserRow>
+                  <UserRow>
+                    <div className="user-box">{message.text}</div>
+                  </UserRow>
                 ) : message.role === 'asset' ? (
                   <AssetCard>
                     <strong>{message.title}</strong>
                     <p>{message.text}</p>
-                    <button type="button" onClick={() => { setSelectedAsset(message); setShowSaveModal(true); }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedAsset(message);
+                        setShowSaveModal(true);
+                      }}
+                    >
                       저장하기
                     </button>
                   </AssetCard>
@@ -485,7 +515,11 @@ function AnalysisC({ projectId, projectTitle, restoredData }) {
                 )}
               </div>
             ))}
-            {isAnalyzing && <AiRow><div className="ai-box">GPT가 문서를 분석하고 있습니다...</div></AiRow>}
+            {isAnalyzing && (
+              <AiRow>
+                <div className="ai-box">GPT가 문서를 분석하고 있습니다...</div>
+              </AiRow>
+            )}
           </StreamMessageArea>
 
           <BottomPromptInput>
@@ -496,7 +530,9 @@ function AnalysisC({ projectId, projectTitle, restoredData }) {
                 onChange={(event) => setPromptText(event.target.value)}
                 onKeyDown={(event) => event.key === 'Enter' && handleSendMessage()}
               />
-              <button type="button" onClick={handleSendMessage}>전송</button>
+              <button type="button" onClick={handleSendMessage}>
+                전송
+              </button>
             </div>
           </BottomPromptInput>
         </MainQAEngine>
@@ -507,8 +543,12 @@ function AnalysisC({ projectId, projectTitle, restoredData }) {
           <SaveModal>
             <h3>저장하시겠습니까?</h3>
             <div className="actions">
-              <button className="primary" type="button" onClick={handleSaveToProject}>확인</button>
-              <button className="secondary" type="button" onClick={() => setShowSaveModal(false)}>취소</button>
+              <button className="primary" type="button" onClick={handleSaveToProject}>
+                확인
+              </button>
+              <button className="secondary" type="button" onClick={() => setShowSaveModal(false)}>
+                취소
+              </button>
             </div>
           </SaveModal>
         </SaveModalBackdrop>
