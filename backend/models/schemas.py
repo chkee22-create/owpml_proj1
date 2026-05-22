@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 class SignupRequest(BaseModel):
@@ -16,3 +18,11 @@ class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: AuthUser
+
+class ProjectPayload(BaseModel):
+    # 프론트 프로젝트 카드/분석/공유 데이터는 아직 형태가 자주 바뀌므로
+    # MongoDB에는 JSON 객체 전체를 저장하고, 화면 안정화 후 세부 스키마를 고정합니다.
+    project: dict[str, Any]
+
+class ProjectListPayload(BaseModel):
+    projects: list[dict[str, Any]] = Field(default_factory=list)

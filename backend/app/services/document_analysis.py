@@ -97,6 +97,42 @@ def _frequent_terms(text: str, limit: int = 10) -> list[str]:
     return [word for word, _ in counter.most_common(limit)]
 
 
+# 정확도/성능 수치처럼 논문 비교에 자주 필요한 값을 규칙 기반으로 뽑습니다.
+# LLM이 없어도 "어떤 수치가 문서에 있었는지"를 답변에 포함하기 위한 보조 함수입니다.
+def _metric_candidates(text: str, limit: int = 8) -> list[str]:
+    metric_pattern = re.compile(
+        r"(?i)\b(accuracy|precision|recall|f1(?:-score)?|auc|map|bleu|rouge|정확도|정밀도|재현율|성능|오차율|속도)\b"
+        r"[^.\n]{0,80}?(?:\d+(?:\.\d+)?\s?%|\d+\.\d+)"
+    )
+    percent_pattern = re.compile(r"[^.\n]{0,60}\d+(?:\.\d+)?\s?%[^.\n]{0,60}")
+
+    candidates = [_clean_text(match.group(0)) for match in metric_pattern.finditer(text)]
+    if len(candidates) < limit:
+        candidates.extend(_clean_text(match.group(0)) for match in percent_pattern.finditer(text))
+
+    unique_candidates = []
+    seen = set()
+    for candidate in candidates:
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        unique_candidates.append(candidate)
+        if len(unique_candidates) >= limit:
+            break
+    return unique_candidates
+
+
+def _doc_brief(doc: dict) -> dict:
+    text = doc.get("text", "")
+    return {
+        "filename": doc.get("filename", "unknown"),
+        "format": doc.get("format", "unknown"),
+        "key_points": _top_sentences(text, 3) or [text[:220] if text else "추출된 텍스트가 없습니다."],
+        "keywords": _frequent_terms(text, 6),
+        "metrics": _metric_candidates(text, 5),
+    }
+
+
 # PDF 분석은 PyMuPDF의 fitz.open(stream=..., filetype="pdf")를 사용합니다.
 # 각 페이지의 텍스트를 page.get_text("text")로 꺼내 이어 붙입니다.
 def extract_pdf(content: bytes) -> str:
@@ -268,37 +304,53 @@ def build_analysis_answer(question: str, extracted_docs: list[dict]) -> dict:
     combined_text = "\n".join(doc["text"] for doc in extracted_docs if doc["text"])
     highlights = _top_sentences(combined_text, 6)
     terms = _frequent_terms(combined_text)
+    metrics = _metric_candidates(combined_text)
 
     if not combined_text.strip():
         summary = "분석할 텍스트를 찾지 못했습니다. PDF, HWPX, TXT, DOCX 문서를 업로드해주세요."
     else:
         summary = " ".join(highlights[:3]) or combined_text[:500]
 
-    comparison = []
-    for doc in extracted_docs:
-        top = _top_sentences(doc["text"], 2)
-        comparison.append(
-            {
-                "filename": doc["filename"],
-                "format": doc["format"],
-                "key_points": top or [doc["text"][:180] if doc["text"] else "추출된 텍스트가 없습니다."],
-            }
-        )
+    comparison = [_doc_brief(doc) for doc in extracted_docs]
+    keyword_sets = {item["filename"]: set(item["keywords"]) for item in comparison}
 
     answer_lines = [
         "업로드한 자료를 기준으로 분석했습니다.",
         "",
-        "[핵심 내용]",
+        "[핵심 내용 요약]",
         summary,
         "",
         "[중요 키워드]",
         ", ".join(terms) if terms else "키워드를 추출할 텍스트가 부족합니다.",
         "",
-        "[실험 결과/차이점 후보]",
+        "[실험 결과/수치 후보]",
     ]
+
+    if metrics:
+        answer_lines.extend(f"- {metric}" for metric in metrics)
+    else:
+        answer_lines.append("- 정확도, F1, AUC, % 등으로 표시된 실험 수치 후보를 찾지 못했습니다.")
+
+    answer_lines.extend([
+        "",
+        "[문서별 핵심 발췌]",
+    ])
 
     for item in comparison:
         answer_lines.append(f"- {item['filename']} ({item['format']}): {' / '.join(item['key_points'])}")
+        if item["metrics"]:
+            answer_lines.append(f"  · 수치 후보: {' / '.join(item['metrics'])}")
+
+    if len(comparison) >= 2:
+        answer_lines.extend(["", "[문서 간 차이점 후보]"])
+        for item in comparison:
+            other_terms = set().union(
+                *(terms for filename, terms in keyword_sets.items() if filename != item["filename"])
+            )
+            unique_terms = [term for term in item["keywords"] if term not in other_terms]
+            answer_lines.append(
+                f"- {item['filename']}: {', '.join(unique_terms[:5]) if unique_terms else '다른 문서와 겹치는 키워드가 많습니다.'}"
+            )
 
     if question:
         answer_lines.extend(["", "[질문 반영]", f"'{question}' 관점으로 위 문장을 우선 추출했습니다."])
@@ -307,5 +359,6 @@ def build_analysis_answer(question: str, extracted_docs: list[dict]) -> dict:
         "answer": "\n".join(answer_lines),
         "summary": summary,
         "keywords": terms,
+        "metrics": metrics,
         "documents": comparison,
     }
