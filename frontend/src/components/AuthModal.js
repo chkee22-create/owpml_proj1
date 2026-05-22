@@ -18,6 +18,7 @@ export const ModalOverlay = styled.div`
   z-index: 999;
   backdrop-filter: blur(2px);
   padding: 16px;
+  box-sizing: border-box;
 `;
 
 export const CloseIconButton = styled.button`
@@ -74,7 +75,6 @@ export const RecommendHeader = styled.div`
   .logo-box svg {
     width: 24px;
     height: 24px;
-    display: block;
   }
 
   .brand-title {
@@ -133,8 +133,8 @@ export const RecommendBody = styled.div`
 
 export const FigAuthBox = styled.div`
   width: min(420px, 100%);
-  max-height: none;
-  overflow: visible;
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
   background: white;
   border-radius: 16px;
   padding: 34px 36px 26px 36px;
@@ -167,7 +167,6 @@ export const FigAuthBox = styled.div`
   .logo-icon svg {
     width: 28px;
     height: 28px;
-    display: block;
   }
 
   .logo-text h2 {
@@ -222,16 +221,8 @@ export const FigAuthBox = styled.div`
     color: #181600;
   }
 
-  .social-btn.kakao svg {
-    color: #181600;
-  }
-
   .social-btn.naver {
     background: #08c861;
-    color: #ffffff;
-  }
-
-  .social-btn.naver svg {
     color: #ffffff;
   }
 
@@ -277,10 +268,6 @@ export const FigAuthBox = styled.div`
     color: #c4cbd3;
   }
 
-  .input-group input:focus {
-    border-color: ${palette.slate[5]};
-  }
-
   .action-row {
     display: flex;
     width: 100%;
@@ -299,10 +286,6 @@ export const FigAuthBox = styled.div`
     font-weight: 800;
     cursor: pointer;
     transition: background 0.15s;
-  }
-
-  .continue-btn:hover {
-    background: #24292e;
   }
 
   .continue-btn:disabled {
@@ -337,13 +320,29 @@ export const FigAuthBox = styled.div`
     margin: -12px 0 18px 0;
   }
 
-  @media (max-width: 520px) {
-    width: min(420px, 100%);
-    padding: 34px 22px 24px 22px;
+  @media (max-height: 760px) {
+    padding-top: 24px;
+    padding-bottom: 20px;
+
+    .popup-logo {
+      margin-bottom: 14px;
+    }
+
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+    }
 
     .social-btn {
-      grid-template-columns: 36px 1fr 36px;
-      font-size: 14px;
+      height: 42px;
+    }
+
+    .input-group input {
+      height: 42px;
+    }
+
+    .continue-btn {
+      height: 44px;
     }
   }
 `;
@@ -395,8 +394,8 @@ function AuthModal({
           </RecommendHeader>
 
           <RecommendBody>
-            <h3>로그인을 추천 드립니다.</h3>
-            <p>로그인해 보관함을 이용하고,<br />팀원들과 함께 작업하고, 지난 답변을 검색해보세요.</p>
+            <h3>로그인이 필요한 기능입니다.</h3>
+            <p>로그인하면 프로젝트, 분석 질문, 자료와 참여 팀을 계정별로 관리할 수 있어요.</p>
             <div className="auth-links">
               <span onClick={() => setModalMode('login')}>Login</span>
               <span onClick={() => setModalMode('signup')}>signup</span>

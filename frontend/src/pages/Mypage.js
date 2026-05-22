@@ -138,7 +138,7 @@ function Mypage({ onLogoutClick }) {
     try {
       await withdrawAccount();
     } catch (withdrawError) {
-      setError(withdrawError.response?.data?.detail || withdrawError.message || '회원탈퇴에 실패했습니다.');
+      setError(withdrawError.response?.data?.detail || withdrawError.message || '회원 탈퇴에 실패했습니다.');
       setSaving(false);
     }
   };

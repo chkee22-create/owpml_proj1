@@ -15,7 +15,9 @@ router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 @router.post("/chat")
 async def analyze_chat(
     question: str = Form(""),
+    llm_provider: str = Form("openai"),
     openai_api_key: str = Form(""),
+    google_api_key: str = Form(""),
     files: list[UploadFile] = File(default=[]),
 ):
     if not files:
@@ -42,9 +44,15 @@ async def analyze_chat(
     # 키워드와 중요 문장 후보를 Python 로직으로 추출합니다.
     fallback_answer = build_analysis_answer(question, extracted_docs)
 
-    # analyze_with_llm은 OPENAI_API_KEY가 있을 때만 OpenAI API를 호출합니다.
+    # analyze_with_llm은 선택한 제공자(OpenAI/Gemini)의 키가 있을 때만 외부 API를 호출합니다.
     # 키가 없거나 호출 실패 시 None을 반환하고, fallback_answer만 프론트에 보냅니다.
-    llm_answer = analyze_with_llm(question, extracted_docs, openai_api_key.strip() or None)
+    llm_answer = analyze_with_llm(
+        question,
+        extracted_docs,
+        provider=llm_provider.strip() or "openai",
+        openai_api_key=openai_api_key.strip() or None,
+        google_api_key=google_api_key.strip() or None,
+    )
     if not llm_answer:
         return {
             **fallback_answer,

@@ -8,7 +8,7 @@ export const Container = styled.div`
 `;
 
 export const SidebarSlot = styled.div`
-  width: ${props => props.$collapsed ? '0px' : 'clamp(220px, 22vw, 260px)'};
+  width: ${props => props.$collapsed ? '0px' : 'clamp(232px, 19vw, 280px)'};
   height: 100vh;
   flex-shrink: 0;
   overflow: visible;
@@ -17,20 +17,20 @@ export const SidebarSlot = styled.div`
 
 export const SidebarOpenButton = styled.button`
   position: fixed;
-  top: 18px;
+  top: ${props => props.$isFullView ? '22px' : '18px'};
   left: 12px;
   z-index: 30;
-  width: 28px;
-  height: 28px;
-  border: 1px solid #cbd5e1;
+  width: ${props => props.$isFullView ? '34px' : '28px'};
+  height: ${props => props.$isFullView ? '34px' : '28px'};
+  border: 1px solid ${props => props.$isFullView ? 'rgba(20, 125, 115, 0.18)' : '#cbd5e1'};
   border-radius: 8px;
   background: #ffffff;
-  color: #0f172a;
+  color: ${props => props.$isFullView ? '#126f67' : '#0f172a'};
   display: ${props => props.$visible ? 'inline-flex' : 'none'};
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.1);
 
   &:hover {
     color: #0ea5a4;
@@ -38,8 +38,8 @@ export const SidebarOpenButton = styled.button`
   }
 
   svg {
-    width: 16px;
-    height: 16px;
+    width: ${props => props.$isFullView ? '18px' : '16px'};
+    height: ${props => props.$isFullView ? '18px' : '16px'};
   }
 `;
 
@@ -49,7 +49,7 @@ export const MainContent = styled.main`
   padding: ${props => props.$isFullView ? '0px' : '24px 40px'}; 
   padding-left: ${props => {
     if (!props.$sidebarCollapsed) return props.$isFullView ? '0px' : '40px';
-    return props.$isFullView ? '34px' : '68px';
+    return props.$isFullView ? '72px' : '68px';
   }};
   box-sizing: border-box; height: 100vh; overflow: hidden; position: relative;
   transition: padding-left 0.22s ease;
@@ -59,7 +59,7 @@ export const MainContent = styled.main`
     padding: ${props => props.$isFullView ? '0px' : '20px'};
     padding-left: ${props => {
       if (!props.$sidebarCollapsed) return props.$isFullView ? '0px' : '20px';
-      return props.$isFullView ? '32px' : '52px';
+      return props.$isFullView ? '64px' : '52px';
     }};
   }
 `;
@@ -111,45 +111,22 @@ export const DashboardBrand = styled.div`
   display: flex;
   align-items: center;
   gap: 10px;
+  cursor: pointer;
 
-  .logo {
-    width: 36px;
-    height: 36px;
-    background: #0ea5a4;
-    border-radius: 9px;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .logo svg {
-    width: 22px;
-    height: 22px;
+  .logo-image {
     display: block;
-  }
-
-  .brand-text {
-    color: #1e293b;
-    font-size: 17px;
-    font-weight: 800;
-    line-height: 1.05;
-  }
-
-  .brand-text span {
-    display: block;
-    color: #94a3b8;
-    font-size: 10px;
-    font-weight: 700;
-    margin-bottom: 2px;
+    width: 210px;
+    height: 84px;
+    object-fit: contain;
   }
 
   @media (max-width: 560px) {
     top: -20px;
     left: 20px;
 
-    .brand-text {
-      display: none;
+    .logo-image {
+      width: 150px;
+      height: 60px;
     }
   }
 `;

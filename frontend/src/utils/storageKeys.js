@@ -28,7 +28,7 @@ const compactProjectForSharedIndex = (project) => ({
   files: Array.isArray(project.files) ? project.files.slice(0, 20) : [],
   sourceProjects: Array.isArray(project.sourceProjects) ? project.sourceProjects.slice(0, 8) : [],
   visuals: Array.isArray(project.visuals)
-    ? project.visuals.slice(0, 12).map((visual) => ({
+    ? project.visuals.slice(0, 10).map((visual) => ({
         id: visual.id,
         kind: visual.kind,
         title: visual.title,

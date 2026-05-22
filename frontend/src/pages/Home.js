@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
-import { RiRobot2Line } from 'react-icons/ri';
 import { FiBarChart2, FiChevronRight, FiCopy, FiFileText, FiUsers } from 'react-icons/fi';
 import AuthModal from '../components/AuthModal';
 import MypageC from './Mypage';
@@ -19,7 +18,8 @@ import {
   GridContainer,
   FeatureCard,
 } from './styles/Home.styles';
-import { getProjectsKey, getRecentConversationsKey, readJson, writeJson } from '../utils/storageKeys';
+import { getProjectsKey, getRecentConversationsKey, readJson } from '../utils/storageKeys';
+import papermateLogo from '../assets/papermate-logo.png';
 
 const VIEW = {
   MAIN: 'main',
@@ -61,7 +61,7 @@ const syncBrowserHistory = (view, replace = false) => {
 function Home() {
   const loadRecentConversations = () => {
     const parsed = readJson(getRecentConversationsKey(), []);
-    return Array.isArray(parsed) ? parsed.slice(0, 3) : [];
+    return Array.isArray(parsed) ? parsed : [];
   };
 
   const { isLoggedIn, user, logout, login, signup, loading } = useAuth();
@@ -116,10 +116,6 @@ function Home() {
   }, []);
 
   useEffect(() => {
-    const saved = readJson(getRecentConversationsKey(), []);
-    if (Array.isArray(saved) && saved.length > 3) {
-      writeJson(getRecentConversationsKey(), saved.slice(0, 3));
-    }
     setRecentConversations(loadRecentConversations());
     setRestoredData(null);
     setShareOpenData(null);
@@ -145,7 +141,7 @@ function Home() {
     else if (menuName === VIEW.ANALYSIS) navigateToView(VIEW.ANALYSIS);
     else if (menuName === VIEW.PROJECTS) navigateToView(VIEW.PROJECTS);
     else if (menuName === VIEW.MYPAGE || menuName === '프로필') navigateToView(VIEW.MYPAGE);
-    else if (menuName === '새 채팅') navigateToView(VIEW.MAIN, { clearRestoredData: true });
+    else if (menuName === '새 채팅') navigateToView(VIEW.ANALYSIS, { clearRestoredData: true });
   };
 
   const openLoginPopup = () => {
@@ -259,6 +255,7 @@ function Home() {
       <SidebarOpenButton
         type="button"
         $visible={isSidebarCollapsed}
+        $isFullView={isFullView}
         onClick={() => setIsSidebarCollapsed(false)}
         aria-label="사이드바 열기"
       >
@@ -299,8 +296,7 @@ function Home() {
           <MainDashboard>
             {isSidebarCollapsed && (
               <DashboardBrand onClick={() => navigateToView(VIEW.MAIN)}>
-                <div className="logo"><RiRobot2Line /></div>
-                <div className="brand-text"><span>ChatBot AI</span>Paper Mate</div>
+                <img className="logo-image" src={papermateLogo} alt="PaperMate" />
               </DashboardBrand>
             )}
             <h2>논문 읽는 시간을 1/10로,<br />작업의 깊이는 2배로</h2>

@@ -172,7 +172,7 @@ export const TopMenuBar = styled.div`
 
     .api-key-box {
       height: 36px;
-      min-width: 230px;
+      min-width: 330px;
       border: 1px solid #bfdbfe;
       border-radius: 6px;
       background: #f8fbff;
@@ -185,6 +185,17 @@ export const TopMenuBar = styled.div`
       i {
         color: #2563eb;
         font-size: 12px;
+      }
+
+      select {
+        height: 24px;
+        border: 1px solid #dbeafe;
+        border-radius: 5px;
+        background: #ffffff;
+        color: #2563eb;
+        font-size: 11px;
+        font-weight: 850;
+        outline: none;
       }
 
       input {
@@ -391,10 +402,69 @@ export const LoadingSection = styled.div`
 export const BottomPromptInput = styled.div`
   padding: 24px 40px;                   /* 💡 본문 폭(60px)에 자연스럽게 이어지도록 여백 밸런스 상향 */
   border-top: 1px solid #e2e8f0; 
-  display: flex; gap: 14px; align-items: center;
+  display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+
+  .file-island-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 4px;
+  }
+
+  .file-island {
+    min-width: 0;
+    max-width: min(320px, 100%);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: #f8fafc;
+    padding: 6px 7px 6px 11px;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 800;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
+  }
+
+  .file-island > i {
+    color: #0ea5a4;
+    font-size: 13px;
+    flex: 0 0 auto;
+  }
+
+  .file-island span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-island .remove-file {
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 999px;
+    background: #fee2e2;
+    color: #dc2626;
+    font-size: 16px;
+    font-weight: 900;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+
+  .file-island .remove-file:hover {
+    background: #dc2626;
+    color: #ffffff;
+  }
   
   /* 검색 입력창 주머니 테두리 */
   .input-wrapper {
+    width: 100%; box-sizing: border-box;
     flex: 1; display: flex; align-items: center; 
     background: #fff; 
     border: 2px solid #e2e8f0;          /* 💡 채팅창과 똑같은 2px 선명한 경계선으로 수정 */
@@ -420,6 +490,20 @@ export const BottomPromptInput = styled.div`
       cursor: pointer;
     }
 
+    .clip-upload {
+      width: 34px;
+      height: 34px;
+      margin-right: 8px;
+      border-radius: 9px;
+      color: #64748b;
+      flex: 0 0 auto;
+
+      &:hover {
+        background: #f1f5f9;
+        color: #0ea5a4;
+      }
+    }
+
     i { 
       color: #94a3b8; font-size: 18px; cursor: pointer; 
       transition: color 0.15s;
@@ -429,6 +513,10 @@ export const BottomPromptInput = styled.div`
 
   @media (max-width: 560px) {
     padding: 16px;
+
+    .file-island {
+      max-width: 100%;
+    }
 
     .input-wrapper {
       border-radius: 12px;

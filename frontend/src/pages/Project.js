@@ -24,6 +24,8 @@ import {
   writeJson,
 } from '../utils/storageKeys';
 
+const MAX_PROJECTS = 10;
+const MAX_VISUALS = 10;
 const defaultProjects = [];
 
 const legacyDummyProjectTitles = [
@@ -33,12 +35,20 @@ const legacyDummyProjectTitles = [
   '딥러닝 이미지 분류 연구 비교',
 ];
 
-const sanitizeProjects = (projects) =>
-  (Array.isArray(projects) ? projects : []).filter(
-    (project) => project && !legacyDummyProjectTitles.includes(project.title)
-  );
-
 const asArray = (value) => (Array.isArray(value) ? value : []);
+
+const sanitizeProjects = (projects) =>
+  asArray(projects).filter((project) => project && !legacyDummyProjectTitles.includes(project.title));
+
+const normalizeProject = (project) => {
+  const visuals = asArray(project.visuals).slice(0, MAX_VISUALS);
+  return { ...project, visuals, charts: visuals.length };
+};
+
+const normalizeProjects = (projects) =>
+  sanitizeProjects(projects)
+    .slice(0, MAX_PROJECTS)
+    .map(normalizeProject);
 
 const createInviteCode = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -50,10 +60,16 @@ const loadProjects = () => {
     const saved = localStorage.getItem(getProjectsKey());
     if (!saved) return defaultProjects;
     const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) ? sanitizeProjects(parsed) : defaultProjects;
+    return Array.isArray(parsed) ? normalizeProjects(parsed) : defaultProjects;
   } catch {
     return defaultProjects;
   }
+};
+
+const persistProjects = (projects) => {
+  const nextProjects = normalizeProjects(projects);
+  writeJson(getProjectsKey(), nextProjects);
+  return nextProjects;
 };
 
 const deleteProjectEverywhere = (projectId) => {
@@ -62,6 +78,7 @@ const deleteProjectEverywhere = (projectId) => {
   const shareRoomKey = getShareRoomKey();
   const savedProjects = readJson(projectsKey, []);
   const deletedProject = Array.isArray(savedProjects) ? savedProjects.find((project) => project.id === projectId) : null;
+
   if (Array.isArray(savedProjects)) {
     writeJson(projectsKey, savedProjects.filter((project) => project.id !== projectId));
   }
@@ -86,7 +103,7 @@ const deleteProjectEverywhere = (projectId) => {
   if (savedRoom) {
     writeJson(shareRoomKey, {
       ...savedRoom,
-      loadedProjectIds: (savedRoom.loadedProjectIds || []).filter((id) => id !== projectId),
+      loadedProjectIds: asArray(savedRoom.loadedProjectIds).filter((id) => id !== projectId),
       comments: savedRoom.comments || [],
       members: savedRoom.members || [],
     });
@@ -121,9 +138,10 @@ const copyText = async (text) => {
 function Projects({ onProjectRestore, onShareProjectOpen }) {
   const [projects, setProjects] = useState(loadProjects);
   const [editingProjectId, setEditingProjectId] = useState(null);
-  const [editTitle, setEditTitle] = useState("");
+  const [editTitle, setEditTitle] = useState('');
   const [selectedVisual, setSelectedVisual] = useState(null);
   const [isViewAllOpen, setIsViewAllOpen] = useState(false);
+  const [limitNotice, setLimitNotice] = useState('');
 
   const visuals = useMemo(
     () =>
@@ -137,8 +155,16 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
     [projects]
   );
 
+  const visualLimitReached = visuals.length >= MAX_VISUALS;
+
+  const commitProjects = (nextProjects) => {
+    const normalizedProjects = persistProjects(nextProjects);
+    setProjects(normalizedProjects);
+    return normalizedProjects;
+  };
+
   useEffect(() => {
-    writeJson(getProjectsKey(), asArray(projects));
+    writeJson(getProjectsKey(), normalizeProjects(projects));
     const sharedProjects = readJson(SHARED_PROJECTS_KEY, []);
     const ownProjectsWithInvite = asArray(projects).filter((project) => project?.inviteCode);
     if (ownProjectsWithInvite.length === 0) return;
@@ -149,13 +175,16 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
       ? sharedProjects.filter((project) => !ownIds.has(project.id) && !ownInviteCodes.has(project.inviteCode))
       : [];
 
-    writeJson(SHARED_PROJECTS_KEY, [...ownProjectsWithInvite, ...otherSharedProjects].slice(0, 100));
+    writeJson(SHARED_PROJECTS_KEY, [...ownProjectsWithInvite, ...otherSharedProjects].slice(0, 100).map(normalizeProject));
   }, [projects]);
 
   useEffect(() => {
     const syncProjects = (event) => {
       if (event.detail?.key && event.detail.key !== getProjectsKey()) return;
-      setProjects(loadProjects());
+      const nextProjects = loadProjects();
+      setProjects((prev) => (
+        JSON.stringify(normalizeProjects(prev)) === JSON.stringify(nextProjects) ? prev : nextProjects
+      ));
     };
 
     window.addEventListener('storage', syncProjects);
@@ -166,45 +195,70 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
     };
   }, []);
 
-  const handleAddProject = (e) => {
-    e.preventDefault();
-    if (asArray(projects).length >= 10) { alert("프로젝트는 최대 10개까지 생성 가능합니다."); return; }
+  const handleAddProject = (event) => {
+    event.preventDefault();
+    const currentProjects = asArray(projects);
+    if (currentProjects.length >= MAX_PROJECTS) {
+      const message = '프로젝트는 최대 10개까지만 만들 수 있습니다. 새 프로젝트를 추가하려면 기존 프로젝트를 삭제해주세요.';
+      setLimitNotice(message);
+      window.alert(message);
+      return;
+    }
+
     const today = new Date().toLocaleDateString('ko-KR').replace(/. /g, '.').slice(0, -1);
-    setProjects([...asArray(projects), {
-      id: `project-${Date.now()}`,
-      type: 'New',
-      title: `새 프로젝트 ${asArray(projects).length + 1}`,
-      updatedAt: today,
-      date: today,
-      charts: 0,
-      isHwp: false,
-      inviteCode: createInviteCode(),
-      files: [],
-      thread: [],
-      visuals: [],
-    }]);
+    commitProjects([
+      ...currentProjects,
+      {
+        id: `project-${Date.now()}`,
+        type: 'New',
+        title: `새 프로젝트 ${currentProjects.length + 1}`,
+        updatedAt: today,
+        date: today,
+        charts: 0,
+        isHwp: false,
+        inviteCode: createInviteCode(),
+        files: [],
+        thread: [],
+        visuals: [],
+      },
+    ]);
+    setLimitNotice('');
   };
 
-  const handleDeleteProject = (e, project) => {
-    e.preventDefault(); e.stopPropagation();
-    const firstConfirm = window.confirm(`"${project.title}" 프로젝트를 정말 삭제하시겠습니까?`);
-    if (!firstConfirm) return;
-
-    const secondConfirm = window.confirm(
-      '삭제하면 이 프로젝트의 저장 문서, 파일 목록, 분석 대화, 공유 타임라인 연결, 최근대화 기록이 모두 영구 삭제됩니다. 계속 진행할까요?'
-    );
-    if (!secondConfirm) return;
+  const handleDeleteProject = (event, project) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!window.confirm(`"${project.title}" 프로젝트를 삭제하시겠습니까?`)) return;
 
     deleteProjectEverywhere(project.id);
-    setProjects((prev) => prev.filter((item) => item.id !== project.id));
+    commitProjects(asArray(projects).filter((item) => item.id !== project.id));
     if (editingProjectId === project.id) setEditingProjectId(null);
-    window.alert('프로젝트가 영구 삭제되었습니다.');
+    setLimitNotice('');
   };
 
-  const handleEditClick = (e, project) => { e.preventDefault(); e.stopPropagation(); setEditingProjectId(project.id); setEditTitle(project.title); };
-  const handleTitleSave = () => { if (!editTitle.trim()) return; const today = new Date().toLocaleDateString('ko-KR').replace(/. /g, '.').slice(0, -1); setProjects(asArray(projects).map(p => p.id === editingProjectId ? { ...p, title: editTitle.trim(), updatedAt: today, date: today } : p)); setEditingProjectId(null); };
-  const handleKeyDown = (e) => { if (e.key === 'Enter') handleTitleSave(); else if (e.key === 'Escape') setEditingProjectId(null); };
-  
+  const handleEditClick = (event, project) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setEditingProjectId(project.id);
+    setEditTitle(project.title);
+  };
+
+  const handleTitleSave = () => {
+    if (!editTitle.trim()) return;
+    const today = new Date().toLocaleDateString('ko-KR').replace(/. /g, '.').slice(0, -1);
+    commitProjects(
+      asArray(projects).map((project) =>
+        project.id === editingProjectId ? { ...project, title: editTitle.trim(), updatedAt: today, date: today } : project
+      )
+    );
+    setEditingProjectId(null);
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter') handleTitleSave();
+    else if (event.key === 'Escape') setEditingProjectId(null);
+  };
+
   const handleProjectRestore = (project) => {
     if (project.source === 'shared-discussion') {
       onShareProjectOpen?.({
@@ -217,10 +271,13 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
 
     if (!onProjectRestore) return;
     const thread = Array.isArray(project.thread) ? project.thread : [];
+    const lastUserMessage = [...thread].reverse().find((item) => item.role === 'user');
+    const lastAiMessage = [...thread].reverse().find((item) => item.role === 'ai' || item.role === 'asset');
+
     onProjectRestore({
       projectId: project.id,
-      q: '저장된 프로젝트를 이어서 작업합니다.',
-      a: '저장된 프로젝트를 이어서 작업합니다.',
+      q: lastUserMessage?.text || project.title,
+      a: lastAiMessage?.text || '저장된 프로젝트를 이어서 작업합니다.',
       projectTitle: project.title,
       inviteCode: project.inviteCode,
       files: asArray(project.files),
@@ -231,49 +288,92 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
   const handleInviteCopy = (event, inviteCode) => {
     event.preventDefault();
     event.stopPropagation();
+    if (!inviteCode) {
+      window.alert('복사할 초대코드가 없습니다.');
+      return;
+    }
     copyText(inviteCode);
   };
 
-  const handleDeleteVisual = (e, id) => {
-    e.preventDefault(); 
-    e.stopPropagation();
-    if(window.confirm("이 시각화 데이터를 삭제하시겠습니까?")) {
-      setProjects((prev) =>
-        prev.map((project) => {
-          const nextVisuals = asArray(project.visuals).filter((visual) => visual.id !== id);
-          return { ...project, visuals: nextVisuals, charts: nextVisuals.length };
-        })
-      );
-      if (selectedVisual && selectedVisual.id === id) {
-        setSelectedVisual(null);
-      }
-    }
+  const handleDeleteVisual = (event, id) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!window.confirm('이 시각화 데이터를 삭제하시겠습니까?')) return;
+
+    commitProjects(
+      asArray(projects).map((project) => {
+        const nextVisuals = asArray(project.visuals).filter((visual) => visual.id !== id);
+        return { ...project, visuals: nextVisuals, charts: nextVisuals.length };
+      })
+    );
+    if (selectedVisual && selectedVisual.id === id) setSelectedVisual(null);
+    setLimitNotice('');
   };
 
   const renderVisualPreview = (visual) => {
-    if (visual?.kind === 'table') return <div className="mini-visual table"><span></span></div>;
-    if (visual?.kind === 'graph') return <div className="mini-visual graph"><i></i></div>;
-    return <div className="mini-visual chart"><span></span></div>;
+    if (visual?.kind === 'table') {
+      return (
+        <div className="mini-visual table">
+          <span></span><span></span><span></span>
+          <span></span><span></span><span></span>
+          <span></span><span></span><span></span>
+        </div>
+      );
+    }
+
+    if (visual?.kind === 'graph') {
+      return (
+        <div className="mini-visual graph">
+          <i></i><i></i><i></i><i></i>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mini-visual chart">
+        <span style={{ height: '34%' }}></span>
+        <span style={{ height: '68%' }}></span>
+        <span style={{ height: '48%' }}></span>
+        <span style={{ height: '82%' }}></span>
+      </div>
+    );
   };
 
   return (
     <ProjectsContainer>
       <HeaderSection><h2>내 프로젝트</h2></HeaderSection>
 
+      {limitNotice && (
+        <div style={{ margin: '0 0 18px 0', color: '#dc2626', fontSize: '13px', fontWeight: 700 }}>
+          {limitNotice}
+        </div>
+      )}
+
       <VisualSection>
         <SectionTitleRow>
-          <h3>저장된 시각화 보관함 <span style={{fontSize: '14px', color: '#94a3b8', fontWeight: '600', marginLeft: '6px'}}>({visuals.length}/10)</span></h3>
+          <h3>
+            저장된 시각화 보관함
+            <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '600', marginLeft: '6px' }}>
+              ({Math.min(visuals.length, MAX_VISUALS)}/{MAX_VISUALS})
+            </span>
+          </h3>
           <div className="btn-group">
             <button type="button" className="sub-btn" onClick={() => setIsViewAllOpen(true)}>전체 보기</button>
           </div>
         </SectionTitleRow>
-        
+
+        {visualLimitReached && (
+          <div style={{ margin: '-8px 0 16px 0', color: '#64748b', fontSize: '12.5px', fontWeight: 700 }}>
+            시각화 보관함은 최대 10개까지 저장됩니다. 새 시각화를 저장하려면 기존 항목을 삭제해주세요.
+          </div>
+        )}
+
         <VisualBoxContainer>
           {visuals.length === 0 ? (
             <EmptyCard as="div"><span>저장된 시각화가 없습니다.</span></EmptyCard>
           ) : visuals.slice(0, 3).map((visual) => (
             <VisualCard key={visual.id} onClick={() => setSelectedVisual(visual)}>
-              <button className="delete-visual-btn" onClick={(e) => handleDeleteVisual(e, visual.id)} title="삭제">
+              <button className="delete-visual-btn" onClick={(event) => handleDeleteVisual(event, visual.id)} title="삭제">
                 <i className="fa-solid fa-trash"></i>
               </button>
               <div className="mock-img">{renderVisualPreview(visual)}</div>
@@ -285,28 +385,102 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
       </VisualSection>
 
       <SectionTitleRow>
-        <h3>진행 중인 프로젝트 <span style={{fontSize: '14px', color: '#94a3b8', fontWeight: '600', marginLeft: '8px'}}>({asArray(projects).length}/10)</span></h3>
+        <h3>
+          진행 중인 프로젝트
+          <span style={{ fontSize: '14px', color: '#94a3b8', fontWeight: '600', marginLeft: '8px' }}>
+            ({asArray(projects).length}/{MAX_PROJECTS})
+          </span>
+        </h3>
         <button type="button" className="primary-btn" onClick={handleAddProject}>+ 새 프로젝트...</button>
       </SectionTitleRow>
 
       <ProjectGrid>
-        {asArray(projects).map((project) => (
-          <ProjectCard key={project.id} onClick={() => handleProjectRestore(project)}>
-            <h3>{project.title}</h3>
-            <button onClick={(e) => handleInviteCopy(e, project.inviteCode)}>초대코드: {project.inviteCode}</button>
-            <button onClick={(e) => handleDeleteProject(e, project)}>삭제</button>
+        {asArray(projects).length === 0 ? (
+          <EmptyCard onClick={handleAddProject}>
+            <span className="plus-icon">+</span>
+            <span>새 프로젝트 추가</span>
+          </EmptyCard>
+        ) : asArray(projects).map((project) => (
+          <ProjectCard
+            key={project.id}
+            $shared={project.source === 'shared-discussion'}
+            onClick={() => handleProjectRestore(project)}
+          >
+            <div className={`tag ${project.isHwp ? 'hwp' : ''} ${project.source === 'shared-discussion' ? 'shared' : ''}`}>
+              {project.type || (project.source === 'shared-discussion' ? 'Shared' : 'New')}
+            </div>
+            {editingProjectId === project.id ? (
+              <input
+                type="text"
+                className="title-input"
+                value={editTitle}
+                onChange={(event) => setEditTitle(event.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                onClick={(event) => event.stopPropagation()}
+              />
+            ) : (
+              <h3>{project.title}</h3>
+            )}
+            <div className="date">최근 수정 {project.date || project.updatedAt}</div>
+            <button
+              type="button"
+              className="invite-code"
+              title="클릭하면 초대코드가 복사됩니다"
+              onClick={(event) => handleInviteCopy(event, project.inviteCode)}
+            >
+              <span>초대코드</span>
+              <strong>{project.inviteCode || '없음'}</strong>
+            </button>
+            <div className="profile-thumbnail"><i className="fa-regular fa-circle-user"></i></div>
+            <div className="card-footer">
+              <div className="meta-info">
+                <span><i className="fa-solid fa-user"></i> {project.source === 'shared-discussion' ? '공유' : '개인'}</span>
+                {(project.charts || 0) > 0 && (
+                  <span><i className="fa-solid fa-box-archive"></i> 차트 {project.charts}개</span>
+                )}
+              </div>
+              <div className="action-btns">
+                <button type="button" className="edit-icon-btn" onClick={(event) => handleEditClick(event, project)} title="프로젝트명 수정">
+                  <i className="fa-solid fa-pen"></i>
+                </button>
+                <button type="button" className="delete-icon-btn" onClick={(event) => handleDeleteProject(event, project)} title="프로젝트 삭제">
+                  <i className="fa-solid fa-trash"></i>
+                </button>
+              </div>
+            </div>
           </ProjectCard>
         ))}
+        {asArray(projects).length > 0 && asArray(projects).length < MAX_PROJECTS && (
+          <EmptyCard onClick={handleAddProject}>
+            <span className="plus-icon">+</span>
+            <span>새 프로젝트 추가</span>
+          </EmptyCard>
+        )}
       </ProjectGrid>
 
       {isViewAllOpen && (
         <ModalOverlay onClick={() => setIsViewAllOpen(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            {visuals.map((visual) => (
-               <VisualCard key={visual.id} onClick={() => setSelectedVisual(visual)}>
-                 <h4>{visual.title}</h4>
-               </VisualCard>
-            ))}
+          <ModalContent onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h3>모든 시각화 보관함 ({Math.min(visuals.length, MAX_VISUALS)}/{MAX_VISUALS})</h3>
+              <button type="button" onClick={() => setIsViewAllOpen(false)}><i className="fa-solid fa-xmark"></i></button>
+            </div>
+            <div className="modal-body">
+              {visuals.length === 0 ? (
+                <EmptyCard as="div"><span>저장된 시각화가 없습니다.</span></EmptyCard>
+              ) : visuals.map((visual) => (
+                <VisualCard key={visual.id} onClick={() => setSelectedVisual(visual)}>
+                  <button className="delete-visual-btn" onClick={(event) => handleDeleteVisual(event, visual.id)} title="삭제">
+                    <i className="fa-solid fa-trash"></i>
+                  </button>
+                  <div className="mock-img">{renderVisualPreview(visual)}</div>
+                  <h4>{visual.title}</h4>
+                  <span>{visual.projectTitle} · {visual.date}</span>
+                </VisualCard>
+              ))}
+            </div>
           </ModalContent>
         </ModalOverlay>
       )}
@@ -315,8 +489,33 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
       <DrawerContainer $show={!!selectedVisual}>
         {selectedVisual && (
           <>
-            <h3>{selectedVisual.title}</h3>
-            <button onClick={() => setSelectedVisual(null)}>닫기</button>
+            <div className="drawer-header">
+              <div className="title-wrap">
+                <h3>{selectedVisual.title}</h3>
+                <span>{selectedVisual.projectTitle} · 저장 일자: {selectedVisual.date}</span>
+              </div>
+              <button type="button" className="close-btn" onClick={() => setSelectedVisual(null)}>
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div className="drawer-body">
+              <div className="visual-preview">{renderVisualPreview(selectedVisual)}</div>
+              <div className="info-section"><h5>데이터 분석 요약</h5><p>{selectedVisual.desc}</p></div>
+              <div className="info-section">
+                <h5>세부 정보 필드</h5>
+                <div className="details-list">
+                  {asArray(selectedVisual.details).map((item, index) => (
+                    <div className="detail-item" key={index}>
+                      <span className="lbl">{item.lbl}</span>
+                      <span className="val">{item.val}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="drawer-footer">
+              <button type="button" className="action-btn">보고서 데이터 다운로드 (PNG)</button>
+            </div>
           </>
         )}
       </DrawerContainer>

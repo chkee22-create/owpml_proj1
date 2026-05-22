@@ -1,0 +1,39 @@
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
+from app.services.document_analysis import build_analysis_answer, extract_file_text
+from app.services.visual_buttons import VISUAL_CREATORS
+
+
+router = APIRouter(prefix="/api/visuals", tags=["visuals"])
+
+
+@router.post("/{visual_type}")
+async def create_visual(
+    visual_type: str,
+    analysis_text: str = Form(""),
+    files: list[UploadFile] = File(default=[]),
+):
+    """분석 페이지의 표/그래프/이미지/마인드맵 버튼이 호출하는 생성 API입니다."""
+    creator = VISUAL_CREATORS.get(visual_type)
+    if not creator:
+        raise HTTPException(status_code=404, detail="지원하지 않는 시각화 유형입니다.")
+
+    extracted_docs = []
+    for upload in files:
+        content = await upload.read()
+        text, file_format = extract_file_text(upload.filename or "unknown", content)
+        extracted_docs.append(
+            {
+                "filename": upload.filename or "unknown",
+                "format": file_format,
+                "text": text,
+            }
+        )
+
+    source_text = analysis_text.strip()
+    if not source_text and extracted_docs:
+        source_text = build_analysis_answer("시각화 자료로 정리해줘", extracted_docs)["answer"]
+    if not source_text:
+        source_text = "업로드 문서 또는 분석 답변이 없어 기본 시각화 예시를 생성합니다."
+
+    return {"visual": creator(extracted_docs, source_text)}

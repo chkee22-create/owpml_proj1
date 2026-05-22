@@ -1,52 +1,30 @@
-import { palette } from './src/shared/palette'; // 💡 palette.js의 실제 위치에 맞게 경로를 꼭 확인해 주세요!
+const toScale = (values) => ({
+  50: values[0],
+  100: values[1],
+  200: values[2],
+  300: values[3],
+  400: values[4],
+  500: values[5],
+  600: values[6],
+  700: values[7],
+  800: values[8],
+  900: values[9],
+});
 
-// [0]~[9] 배열을 Tailwind의 50~900 오브젝트로 자동 변환해주는 꿀함수
-const transformArrayToTailwind = (arr) => {
-  if (!Array.isArray(arr)) return arr;
-  return {
-    50: arr[0],
-    100: arr[1],
-    200: arr[2],
-    300: arr[3],
-    400: arr[4],
-    500: arr[5],
-    600: arr[6],
-    700: arr[7],
-    800: arr[8],
-    900: arr[9],
-  };
-};
-// 1. config라는 변수에 객체를 먼저 할당하고
-const config = {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+module.exports = {
+  content: ['./public/index.html', './src/**/*.{js,jsx,ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        kakao: palette.kakao,
-        naver: palette.naver,
-        gray: transformArrayToTailwind(palette.gray),
-        slate: transformArrayToTailwind(palette.slate),
-        teal: transformArrayToTailwind(palette.teal),
-        google: transformArrayToTailwind(palette.google),
-        red: transformArrayToTailwind(palette.red),
-        pink: transformArrayToTailwind(palette.pink),
-        grape: transformArrayToTailwind(palette.grape),
-        violet: transformArrayToTailwind(palette.violet),
-        indigo: transformArrayToTailwind(palette.indigo),
-        blue: transformArrayToTailwind(palette.blue),
-        cyan: transformArrayToTailwind(palette.cyan),
-        green: transformArrayToTailwind(palette.green),
-        lime: transformArrayToTailwind(palette.lime),
-        yellow: transformArrayToTailwind(palette.yellow),
-        orange: transformArrayToTailwind(palette.orange),
+        kakao: '#fee500',
+        naver: '#03c75a',
+        gray: toScale(['#f8f9fa', '#f1f3f5', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#868e96', '#495057', '#343a40', '#212529']),
+        slate: toScale(['#f8f9fa', '#f1f3f5', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#868e96', '#495057', '#343a40', '#212529']),
+        teal: toScale(['#e6f4f4', '#c3fae8', '#96f2d7', '#63e6be', '#38d9a9', '#0ea5a4', '#0d9493', '#0ca678', '#099268', '#087f5b']),
+        green: toScale(['#ebfbee', '#d3f9d8', '#b2f2bb', '#8ce99a', '#69db7c', '#51cf66', '#40c057', '#37b24d', '#2f9e44', '#2b8a3e']),
+        blue: toScale(['#e7f5ff', '#d0ebff', '#a5d8ff', '#74c0fc', '#4dabf7', '#339af0', '#228be6', '#1c7ed6', '#1971c2', '#1864ab']),
       },
     },
   },
   plugins: [],
 };
-
-// 2. 그 변수를 export default 해줍니다.
-export default config;

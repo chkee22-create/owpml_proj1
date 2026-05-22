@@ -51,6 +51,7 @@ const fallbackRoom = {
 };
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
+const MAX_RECENT_CONVERSATIONS = 50;
 
 // 로컬/공유 프로젝트 목록에서 유효한 프로젝트만 남깁니다.
 const sanitizeProjects = (projects) =>
@@ -753,7 +754,7 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
         createdAt: storableSharedProject.createdAt,
       },
       ...(Array.isArray(savedRecents) ? savedRecents.filter((item) => item.projectId !== projectId && item.id !== projectId) : []),
-    ].slice(0, 3));
+    ].slice(0, MAX_RECENT_CONVERSATIONS));
 
     setProjects(loadOwnProjects());
     setSharedProjects(loadSharedProjects());

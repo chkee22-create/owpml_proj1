@@ -31,13 +31,21 @@ def _clean_text(text: str) -> str:
 # 문장을 대략적으로 나눕니다.
 # 완전한 자연어 처리 라이브러리는 아니고, 한국어/영어 문장 구분자를 기준으로 단순 분리합니다.
 def _sentences(text: str) -> list[str]:
-    pieces = re.split(r"(?<=[.!?。！？])\s+|(?<=[다요음함임됨])\.\s*|\n+", text)
-    return [_clean_text(piece) for piece in pieces if len(_clean_text(piece)) > 18]
+    pieces = re.split(r"(?<=[.!?。！？])\s+|(?<=[다요음함임됨])\.\s*|\n+|(?<=다)\s+", text)
+    sentences = []
+    seen = set()
+    for piece in pieces:
+        cleaned = _clean_text(piece)
+        if len(cleaned) < 18 or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        sentences.append(cleaned)
+    return sentences
 
 
 # 기본 분석에서 중요한 문장 후보를 고르기 위한 점수 함수입니다.
 # 정확도, 실험, 데이터셋, 비교 같은 연구 문서 키워드가 있으면 점수를 더 줍니다.
-def _keyword_score(sentence: str) -> int:
+def _keyword_score(sentence: str, query_terms: set[str] | None = None, term_weights: Counter | None = None) -> float:
     keywords = [
         "accuracy",
         "precision",
@@ -61,13 +69,35 @@ def _keyword_score(sentence: str) -> int:
         "제안",
     ]
     lowered = sentence.lower()
-    return sum(2 for keyword in keywords if keyword in lowered) + min(len(sentence) // 80, 3)
+    score = sum(2.2 for keyword in keywords if keyword in lowered) + min(len(sentence) / 90, 3)
+    score += len(re.findall(r"\d+(?:\.\d+)?\s?%|\d+\.\d+", sentence)) * 2.5
+    if query_terms:
+        score += sum(2.8 for term in query_terms if term and term in lowered)
+    if term_weights:
+        sentence_terms = set(re.findall(r"[A-Za-z가-힣0-9]{2,}", lowered))
+        score += sum(min(term_weights.get(term, 0), 4) * 0.38 for term in sentence_terms)
+    return score
 
 
 # 문장 후보를 점수순으로 정렬해 상위 문장만 뽑습니다.
-def _top_sentences(text: str, limit: int = 5) -> list[str]:
-    ranked = sorted(_sentences(text), key=_keyword_score, reverse=True)
-    return ranked[:limit]
+def _top_sentences(text: str, limit: int = 5, question: str = "") -> list[str]:
+    sentences = _sentences(text)
+    if not sentences:
+        return []
+
+    query_terms = set(_frequent_terms(question, 8)) if question else set()
+    term_weights = Counter(re.findall(r"[A-Za-z가-힣0-9]{2,}", text.lower()))
+    ranked = sorted(
+        enumerate(sentences),
+        key=lambda item: (
+            _keyword_score(item[1], query_terms, term_weights)
+            + max(0, 2.2 - item[0] * 0.08),  # 초반 문장에 약간 가중치
+            -item[0],
+        ),
+        reverse=True,
+    )
+    selected = sorted(ranked[:limit], key=lambda item: item[0])
+    return [sentence for _, sentence in selected]
 
 
 # 자주 등장하는 단어를 뽑아 키워드 목록을 만듭니다.
@@ -102,9 +132,9 @@ def _frequent_terms(text: str, limit: int = 10) -> list[str]:
 def _metric_candidates(text: str, limit: int = 8) -> list[str]:
     metric_pattern = re.compile(
         r"(?i)\b(accuracy|precision|recall|f1(?:-score)?|auc|map|bleu|rouge|정확도|정밀도|재현율|성능|오차율|속도)\b"
-        r"[^.\n]{0,80}?(?:\d+(?:\.\d+)?\s?%|\d+\.\d+)"
+        r"[^\n]{0,90}?(?:\d+(?:\.\d+)?\s?%|\d+\.\d+)"
     )
-    percent_pattern = re.compile(r"[^.\n]{0,60}\d+(?:\.\d+)?\s?%[^.\n]{0,60}")
+    percent_pattern = re.compile(r"[^\n]{0,70}\d+(?:\.\d+)?\s?%[^\n]{0,70}")
 
     candidates = [_clean_text(match.group(0)) for match in metric_pattern.finditer(text)]
     if len(candidates) < limit:
@@ -122,12 +152,33 @@ def _metric_candidates(text: str, limit: int = 8) -> list[str]:
     return unique_candidates
 
 
+def _extractive_summary(text: str, question: str = "", limit: int = 4) -> list[str]:
+    summary = _top_sentences(text, limit, question)
+    if summary:
+        return summary
+    cleaned = _clean_text(text)
+    return [cleaned[:360]] if cleaned else []
+
+
+def _question_intent(question: str) -> str:
+    lowered = (question or "").lower()
+    if any(word in lowered for word in ["중요", "핵심", "요약", "summary", "main"]):
+        return "summary"
+    if any(word in lowered for word in ["실험", "결과", "정확도", "성능", "score", "accuracy", "f1"]):
+        return "metrics"
+    if any(word in lowered for word in ["비교", "차이", "다른", "compare", "difference"]):
+        return "compare"
+    if any(word in lowered for word in ["문장", "발췌", "인용", "quote", "extract"]):
+        return "extract"
+    return "general"
+
+
 def _doc_brief(doc: dict) -> dict:
     text = doc.get("text", "")
     return {
         "filename": doc.get("filename", "unknown"),
         "format": doc.get("format", "unknown"),
-        "key_points": _top_sentences(text, 3) or [text[:220] if text else "추출된 텍스트가 없습니다."],
+        "key_points": _top_sentences(text, 4) or [text[:260] if text else "추출된 텍스트가 없습니다."],
         "keywords": _frequent_terms(text, 6),
         "metrics": _metric_candidates(text, 5),
     }
@@ -302,29 +353,52 @@ def extract_file_text(filename: str, content: bytes) -> tuple[str, str]:
 # 진짜 LLM이 아니라, 위에서 추출한 텍스트에서 중요 문장/키워드를 규칙 기반으로 뽑습니다.
 def build_analysis_answer(question: str, extracted_docs: list[dict]) -> dict:
     combined_text = "\n".join(doc["text"] for doc in extracted_docs if doc["text"])
-    highlights = _top_sentences(combined_text, 6)
+    intent = _question_intent(question)
+    highlights = _top_sentences(combined_text, 10, question)
+    summary_points = _extractive_summary(combined_text, question, 4)
     terms = _frequent_terms(combined_text)
     metrics = _metric_candidates(combined_text)
 
     if not combined_text.strip():
-        summary = "분석할 텍스트를 찾지 못했습니다. PDF, HWPX, TXT, DOCX 문서를 업로드해주세요."
+        summary = (
+            "업로드 파일은 받았지만 추출 가능한 본문 텍스트가 거의 없습니다. "
+            "이미지라면 OCR 설치가 필요할 수 있고, 구형 HWP는 HWPX 변환이 더 안정적입니다."
+        )
     else:
-        summary = " ".join(highlights[:3]) or combined_text[:500]
+        summary = " ".join(summary_points) or combined_text[:600]
 
     comparison = [_doc_brief(doc) for doc in extracted_docs]
     keyword_sets = {item["filename"]: set(item["keywords"]) for item in comparison}
 
     answer_lines = [
-        "업로드한 자료를 기준으로 분석했습니다.",
+        "OpenAI 없이 로컬 기본 분석으로 처리했습니다.",
+        f"질문 의도: {intent}",
         "",
         "[핵심 내용 요약]",
-        summary,
+    ]
+
+    if summary_points:
+        answer_lines.extend(f"{index}. {point}" for index, point in enumerate(summary_points, start=1))
+    else:
+        answer_lines.append(summary)
+
+    answer_lines.extend([
+        "",
+        "[중요 문장 발췌]",
+    ])
+
+    if highlights:
+        answer_lines.extend(f"- {sentence}" for sentence in highlights[:8])
+    else:
+        answer_lines.append("- 발췌할 문장을 찾지 못했습니다.")
+
+    answer_lines.extend([
         "",
         "[중요 키워드]",
         ", ".join(terms) if terms else "키워드를 추출할 텍스트가 부족합니다.",
         "",
         "[실험 결과/수치 후보]",
-    ]
+    ])
 
     if metrics:
         answer_lines.extend(f"- {metric}" for metric in metrics)
@@ -337,9 +411,12 @@ def build_analysis_answer(question: str, extracted_docs: list[dict]) -> dict:
     ])
 
     for item in comparison:
-        answer_lines.append(f"- {item['filename']} ({item['format']}): {' / '.join(item['key_points'])}")
+        answer_lines.append(f"- {item['filename']} ({item['format']})")
+        answer_lines.extend(f"  · {point}" for point in item["key_points"][:4])
         if item["metrics"]:
             answer_lines.append(f"  · 수치 후보: {' / '.join(item['metrics'])}")
+        if item["keywords"]:
+            answer_lines.append(f"  · 키워드: {', '.join(item['keywords'][:6])}")
 
     if len(comparison) >= 2:
         answer_lines.extend(["", "[문서 간 차이점 후보]"])
@@ -353,7 +430,13 @@ def build_analysis_answer(question: str, extracted_docs: list[dict]) -> dict:
             )
 
     if question:
-        answer_lines.extend(["", "[질문 반영]", f"'{question}' 관점으로 위 문장을 우선 추출했습니다."])
+        matched = _top_sentences(combined_text, 4, question)
+        answer_lines.extend(["", "[질문 반영 답변]"])
+        if matched:
+            answer_lines.append(f"'{question}' 관점에서 가장 가까운 근거 문장은 아래와 같습니다.")
+            answer_lines.extend(f"- {sentence}" for sentence in matched)
+        else:
+            answer_lines.append(f"'{question}'와 직접 연결되는 문장을 찾지 못해 전체 요약을 우선 제공했습니다.")
 
     return {
         "answer": "\n".join(answer_lines),
