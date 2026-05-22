@@ -50,15 +50,24 @@ export const authAPI = {
 };
 
 export const analysisAPI = {
-  chat: (question, files) => {
+  chat: (question, files, openaiApiKey = '') => {
     const formData = new FormData();
     formData.append('question', question);
+    if (openaiApiKey) formData.append('openai_api_key', openaiApiKey);
     files.forEach((file) => formData.append('files', file));
 
     return apiClient.post('/api/analysis/chat', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+};
+
+export const projectAPI = {
+  list: () => apiClient.get('/api/projects'),
+  sync: (projects) => apiClient.put('/api/projects/sync', { projects }),
+  save: (project) => apiClient.post('/api/projects', { project }),
+  delete: (projectId) => apiClient.delete(`/api/projects/${encodeURIComponent(projectId)}`),
+  findByInviteCode: (inviteCode) => apiClient.get(`/api/projects/invite/${encodeURIComponent(inviteCode)}`),
 };
 
 export default apiClient;

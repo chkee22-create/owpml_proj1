@@ -7,6 +7,68 @@ export const BASE_SHARE_ROOM_KEY = 'papermate.shareRoom.v1';
 export const SHARED_PROJECTS_KEY = 'papermate.sharedProjects.v1';
 export const SHARED_ROOM_PREFIX = 'papermate.sharedRoom.v1';
 
+const isQuotaExceededError = (error) =>
+  error?.name === 'QuotaExceededError' ||
+  error?.code === 22 ||
+  String(error?.message || '').includes('exceeded the quota');
+
+// 초대코드 검색용 전역 인덱스에는 프로젝트 원본 전체를 넣지 않습니다.
+// 이미지 dataUrl 같은 큰 값은 localStorage 한도를 빨리 넘기므로, 공유 검색과 카드 복원에 필요한 가벼운 정보만 남깁니다.
+const compactProjectForSharedIndex = (project) => ({
+  id: project.id,
+  source: project.source,
+  type: project.type,
+  title: project.title,
+  owner: project.owner,
+  updatedAt: project.updatedAt,
+  date: project.date,
+  charts: project.charts,
+  isHwp: project.isHwp,
+  inviteCode: project.inviteCode,
+  files: Array.isArray(project.files) ? project.files.slice(0, 20) : [],
+  sourceProjects: Array.isArray(project.sourceProjects) ? project.sourceProjects.slice(0, 8) : [],
+  visuals: Array.isArray(project.visuals)
+    ? project.visuals.slice(0, 12).map((visual) => ({
+        id: visual.id,
+        kind: visual.kind,
+        title: visual.title,
+        desc: visual.desc,
+        details: Array.isArray(visual.details) ? visual.details.slice(0, 8) : [],
+        rows: Array.isArray(visual.rows) ? visual.rows.slice(0, 8) : undefined,
+        date: visual.date,
+        projectTitle: visual.projectTitle,
+      }))
+    : [],
+  thread: Array.isArray(project.thread)
+    ? project.thread.slice(0, 20).map((item) => ({
+        id: item.id,
+        role: item.role,
+        title: item.title,
+        text: typeof item.text === 'string' ? item.text.slice(0, 1200) : '',
+        rows: Array.isArray(item.rows) ? item.rows.slice(0, 8) : undefined,
+      }))
+    : [],
+  discussionImages: Array.isArray(project.discussionImages)
+    ? project.discussionImages.slice(0, 8).map((image) => ({
+        id: image.id,
+        title: image.title,
+        time: image.time,
+        uploadedBy: image.uploadedBy,
+        hasImage: Boolean(image.dataUrl || image.hasImage),
+      }))
+    : [],
+  discussionComments: Array.isArray(project.discussionComments)
+    ? project.discussionComments.slice(-50)
+    : [],
+  createdAt: project.createdAt,
+});
+
+const compactSharedProjects = (projects) =>
+  (Array.isArray(projects) ? projects : [])
+    .filter((project) => project?.inviteCode)
+    .map(compactProjectForSharedIndex)
+    .slice(0, 60);
+
 // userId 또는 username을 키 뒤에 붙여서 계정별 저장 공간을 분리합니다.
 // 예: papermate.projects.v1.3, papermate.projects.v1.user14530
 const getUserScope = () => {
@@ -37,8 +99,19 @@ export const readJson = (key, fallback) => {
 // JSON.stringify로 저장한 뒤 CustomEvent를 발생시켜 같은 화면 안의 다른 컴포넌트도 즉시 갱신되게 합니다.
 // 브라우저 기본 storage 이벤트는 다른 탭에는 잘 전달되지만, 같은 탭 내부 상태 갱신에는 직접 이벤트가 더 확실합니다.
 export const writeJson = (key, value) => {
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    if (isQuotaExceededError(error) && key === SHARED_PROJECTS_KEY) {
+      localStorage.removeItem(key);
+      localStorage.setItem(key, JSON.stringify(compactSharedProjects(value)));
+    } else {
+      console.warn('PaperMate storage write skipped:', key, error);
+      return false;
+    }
+  }
   window.dispatchEvent(new CustomEvent('papermate-storage-updated', { detail: { key } }));
+  return true;
 };
 
 // 마이그레이션할 값이 실제로 비어 있지 않은지 확인하는 보조 함수입니다.
@@ -66,7 +139,7 @@ const mergeProjectsIntoSharedIndex = (projects) => {
     ? sharedProjects.filter((project) => !ownIds.has(project.id) && !ownInviteCodes.has(project.inviteCode))
     : [];
 
-  writeJson(SHARED_PROJECTS_KEY, [...projectsWithInvite, ...otherSharedProjects].slice(0, 100));
+  writeJson(SHARED_PROJECTS_KEY, compactSharedProjects([...projectsWithInvite, ...otherSharedProjects]));
 };
 
 // 예전 버전에서 저장한 키를 현재 로그인 계정의 새 키로 한 번만 옮깁니다.

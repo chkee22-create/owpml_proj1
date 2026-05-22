@@ -163,12 +163,19 @@ export const ProjectGrid = styled.div`
 `;
 
 export const ProjectCard = styled.div`
-  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px;
+  background: ${(props) => (props.$shared ? '#f8fbff' : '#ffffff')};
+  border: 1px solid ${(props) => (props.$shared ? '#bfdbfe' : '#e2e8f0')};
+  border-left: 5px solid ${(props) => (props.$shared ? '#3b82f6' : '#e2e8f0')};
+  border-radius: 12px; padding: 24px;
   display: flex; flex-direction: column; position: relative; min-height: 204px; box-sizing: border-box;
   cursor: pointer; transition: all 0.2s ease-in-out;
-  &:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04); border-color: #cbd5e1; }
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: ${(props) => (props.$shared ? '0 12px 22px rgba(59, 130, 246, 0.11)' : '0 10px 15px -3px rgba(0, 0, 0, 0.04)')};
+    border-color: ${(props) => (props.$shared ? '#93c5fd' : '#cbd5e1')};
+  }
   
-  .tag { align-self: flex-start; background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 12px; margin-bottom: 12px; &.hwp { background: #e6f4f4; color: #0ea5a4; } }
+  .tag { align-self: flex-start; background: #f1f5f9; color: #475569; font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 12px; margin-bottom: 12px; &.hwp { background: #e6f4f4; color: #0ea5a4; } &.shared { background: #dbeafe; color: #2563eb; } }
   h3 { font-size: 16px; font-weight: 800; color: #1e293b; margin: 0 0 6px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%; }
   .title-input { font-size: 16px; font-weight: 800; color: #1e293b; margin: 0 0 6px 0; padding: 2px 6px; border: 1px solid #0ea5a4; border-radius: 4px; outline: none; width: 80%; box-sizing: border-box; font-family: inherit; background: #f8fafc; }
   .date { font-size: 11px; color: #94a3b8; font-weight: 700; margin-bottom: auto; }
@@ -209,7 +216,7 @@ export const ProjectCard = styled.div`
   .card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 12px; margin-top: 12px; }
   .meta-info { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #64748b; font-weight: 700; i { color: #94a3b8; } }
   .action-btns { display: flex; gap: 10px; button { background: none; border: none; font-size: 15px; color: #94a3b8; cursor: pointer; transition: color 0.1s; &.edit-icon-btn:hover { color: #1e293b; } &.delete-icon-btn:hover { color: #e74c3c; } } }
-  .profile-thumbnail { position: absolute; right: 24px; top: 24px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: transparent; i { font-size: 32px; color: ${palette.slate[4]}; } }
+  .profile-thumbnail { position: absolute; right: 24px; top: 24px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: transparent; i { font-size: 32px; color: ${(props) => (props.$shared ? '#60a5fa' : palette.slate[4])}; } }
 
   @media (max-width: 560px) {
     height: auto;

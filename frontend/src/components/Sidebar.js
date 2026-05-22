@@ -16,9 +16,9 @@ import { palette } from '../shared/palette';
 const SidebarContainer = styled.aside`
   width: clamp(220px, 22vw, 260px); height: 100vh; 
   background: #c8e6c9; 
-  border-right: 1px solid #e2e8f0;      /* 💡 메인 대시보드와 경계를 나누는 깔끔한 우측 실선 유지 */
+  border-right: 1px solid #e2e8f0;
   display: flex; flex-direction: column; 
-  padding: 28px 16px;                    /* 💡 상단 여백을 24px에서 28px로 살짝 넓혀 로고 안정감 확보 */
+  padding: 28px 16px;
   box-sizing: border-box; justify-content: space-between; flex-shrink: 0;
   transform: ${props => props.$collapsed ? 'translateX(-100%)' : 'translateX(0)'};
   transition: transform 0.22s ease;
@@ -30,20 +30,18 @@ const TopBrandSection = styled.div`
   transition: opacity 0.15s;
   &:hover { opacity: 0.85; }
 
-  /* 🎨 사이드바 최상단 미니 로고 박스 */
   .logo { 
     width: 32px; height: 32px; 
-    background: #0ea5a4;                  /* 💡 메인 틸/민트 시그니처 컬러 */
+    background: #0ea5a4;
     border-radius: 8px; color: white; 
     display: flex; align-items: center; justify-content: center;
     
     svg { width: 20px; height: 20px; color: #ffffff; }
   }
   
-  /* 🎨 브랜드 서비스명 타이틀 텍스트 */
   .brand-text { 
     font-size: 16px; font-weight: 800; 
-    color: #1e293b;                       /* 💡 Slate 800 딥 다크 컬러로 선명하게 변경 */
+    color: #1e293b;
     span { 
       display: block; font-size: 10px; 
       color: #94a3b8; font-weight: 700; margin-bottom: -2px; 
@@ -52,15 +50,15 @@ const TopBrandSection = styled.div`
 `;
 
 const NavList = styled.nav`
-  display: flex; flex-direction: column; gap: 6px; /* 💡 메뉴 간격을 8px에서 6px로 살짝 조밀하게 좁혀 세련미 상향 */
+  display: flex; flex-direction: column; gap: 6px;
   flex: 1;
+  min-height: 0;
   
-  /* 🎨 메뉴 그룹을 나누는 중간 라벨 (예: WORKSPACE, MANAGEMENT 등) */
   .section-lbl { 
-    font-size: 11px; font-weight: 800;    /* 💡 대문자나 타이틀 라벨이 묵직하도록 두께 상향 */
-    color: #78909c;                       /* 💡 연초록 배경 위에서 가독성이 더 좋은 Slate-Blue 계열로 톤 변경 */
-    margin: 20px 0 6px 12px;              /* 💡 그룹 간의 위 여백(20px) 확보 및 좌측 인덴트 통일 */
-    letter-spacing: 0.5px;                /* 💡 라벨 텍스트 자간을 넓혀 기획서 느낌 극대화 */
+    font-size: 11px; font-weight: 800;
+    color: #78909c;
+    margin: 20px 0 6px 12px;
+    letter-spacing: 0.5px;
   }
 `;
 
@@ -114,11 +112,10 @@ const CollapseButton = styled.button`
 
 const MenuBtn = styled.div`
   display: flex; align-items: center; gap: 12px; padding: 11px 14px; 
-  border-radius: 8px;                     /* 💡 모서리 둥글기 값을 10px에서 8px로 조절하여 핏 조율 */
+  border-radius: 8px;
   font-size: 14px; font-weight: 700; 
   box-sizing: border-box;
   
-  /* 💡 [반영 포인트] 순백색 스타일 기반 조율 */
   color: ${props => props.$active ? '#0ea5a4' : '#475569'}; 
   background: ${props => props.$active ? '#ffffff' : 'transparent'}; 
   border: 1px solid ${props => props.$active ? 'rgba(15, 23, 42, 0.04)' : 'transparent'};
@@ -126,9 +123,8 @@ const MenuBtn = styled.div`
   
   cursor: pointer; transition: all 0.15s ease-in-out;
   
-  /* 비활성화 상태에서 마우스 올렸을 때의 피드백 효과 */
   &:hover { 
-    background: ${props => props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.4)'}; /* 선택 안 된 메뉴 호버 시 투명하게 동화 */
+    background: ${props => props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.4)'};
     color: #0ea5a4; 
     
     ${NavIcon} {
@@ -136,7 +132,6 @@ const MenuBtn = styled.div`
     }
   }
   
-  /* 메뉴명 좌측에 들어가는 정렬용 아이콘 정밀 세팅 */
   ${NavIcon} { 
     color: ${props => props.$active ? '#0ea5a4' : palette.slate[5]}; 
   }
@@ -153,10 +148,9 @@ const BottomUserCard = styled.div`
   display: flex; align-items: center; gap: 10px; 
   padding: 12px; 
   border-radius: 10px; cursor: pointer; transition: all 0.15s; margin-top: auto;
-  border: 1px solid transparent;        /* 💡 호버 시 깜빡임(털컥거림) 방지용 투명 테두리 */
+  border: 1px solid transparent;
   box-sizing: border-box;
 
-  /* 🎨 유저 프로필 원형 아바타 영역 */
   .profile-circle { 
     width: 32px; height: 32px; 
     border-radius: 50%; 
@@ -165,22 +159,20 @@ const BottomUserCard = styled.div`
     .account-icon {
       width: 32px;
       height: 32px;
-      color: ${palette.slate[5]};         /* 피그마 시안의 그레이 실루엣 컬러 매칭 */
+      color: ${palette.slate[5]};
     }
   }
   
-  /* 🎨 유저 네임명 (user14530 등) */
   .name { 
-    font-size: 13.5px;                   /* 💡 밀도감 있는 폰트 스펙으로 보정 */
+    font-size: 13.5px;
     font-weight: 700; 
-    color: #1e293b;                      /* 💡 유저네임 가독성을 위해 컬러 딥하게 조정 */
+    color: #1e293b;
     flex: 1; 
-    white-space: nowrap;                 /* 💡 유저 이름이 길어져도 개행되지 않고 말줄임표 처리 유도 */
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   
-  /* 유저네임 우측 설정 아이콘 등 */
   .gear-icon { 
     color: #546e7a; 
     width: 16px;
@@ -198,16 +190,17 @@ function Sidebar({
   onLogoClick,
   isLoggedIn,
   username,
-  onProfileClick, // 이 함수가 마이페이지로 이동시키는 함수라고 가정합니다
+  onProfileClick,
   collapsed,
   onCollapse,
   recentConversations = [],
   onRecentConversationClick,
 }) {
+  const visibleRecentConversations = recentConversations.slice(0, 3);
+
   return (
     <SidebarContainer $collapsed={collapsed}>
       <div style={{display:'flex', flexDirection:'column', width:'100%'}}>
-        {/* ... 로고 및 내비게이션 메뉴 영역 (동일) ... */}
         <BrandRow>
           <TopBrandSection onClick={onLogoClick}>
             <div className="logo"><RiRobot2Line /></div>
@@ -223,18 +216,23 @@ function Sidebar({
             <SidebarIcon active={viewMode === 'main'}><TbMessagePlus /></SidebarIcon>
             <span className="menu-text">새로운 채팅</span>
           </MenuBtn>
-          {/* ... 최근 대화 및 기타 메뉴 동일 ... */}
+
           {isLoggedIn && (
             <>
               <div className="section-lbl">최근 대화</div>
-              {recentConversations.length === 0 && (
+              {visibleRecentConversations.length === 0 && (
                 <MenuBtn $active={false}>
                   <SidebarIcon><FiMessageSquare /></SidebarIcon>
                   <span className="menu-text">최근 대화 없음</span>
                 </MenuBtn>
               )}
-              {recentConversations.map((conversation) => (
-                <MenuBtn key={conversation.id} $active={false} onClick={() => onRecentConversationClick?.(conversation)}>
+
+              {visibleRecentConversations.map((conversation) => (
+                <MenuBtn
+                  key={conversation.id}
+                  $active={false}
+                  onClick={() => onRecentConversationClick?.(conversation)}
+                >
                   <SidebarIcon><FiMessageSquare /></SidebarIcon>
                   <span className="menu-text">{conversation.title}</span>
                 </MenuBtn>
@@ -258,12 +256,11 @@ function Sidebar({
       </div>
 
       {isLoggedIn && (
-        <BottomUserCard> {/* 💡 여기서 onClick 제거 */}
+        <BottomUserCard>
           <div className="profile-circle">
             <FiUser className="account-icon" />
           </div>
           <div className="name">{username}</div>
-          {/* 💡 톱니바퀴 아이콘에만 이벤트 연결 */}
           <FiSettings 
             className="gear-icon" 
             onClick={onProfileClick} 

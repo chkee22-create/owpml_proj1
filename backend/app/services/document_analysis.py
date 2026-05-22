@@ -106,7 +106,14 @@ def extract_pdf(content: bytes) -> str:
         return "PDF 분석을 위해 PyMuPDF 패키지가 필요합니다. requirements.txt 설치 후 다시 시도해주세요."
 
     with fitz.open(stream=content, filetype="pdf") as document:
-        return "\n".join(page.get_text("text") for page in document)
+        texts: list[str] = []
+        for page in document:
+            page_text = page.get_text("text")
+            if isinstance(page_text, str):
+                texts.append(page_text)
+            elif page_text is not None:
+                texts.append(str(page_text))
+        return "\n".join(texts)
 
 
 # TXT/CSV/MD 파일은 인코딩을 순서대로 시도합니다.

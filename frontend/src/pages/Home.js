@@ -25,17 +25,18 @@ import {
   GridContainer,
   FeatureCard,
 } from './styles/Home.styles';
-import { getProjectsKey, getRecentConversationsKey, readJson } from '../utils/storageKeys';
+import { getProjectsKey, getRecentConversationsKey, readJson, writeJson } from '../utils/storageKeys';
 
 function Home() {
   const loadRecentConversations = () => {
     const parsed = readJson(getRecentConversationsKey(), []);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.slice(0, 3) : [];
   };
 
   const { isLoggedIn, user, logout, login, signup } = useAuth();
   const [viewMode, setViewMode] = useState('main'); 
   const [restoredData, setRestoredData] = useState(null);
+  const [shareOpenData, setShareOpenData] = useState(null);
   const [recentConversations, setRecentConversations] = useState(loadRecentConversations);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [formData, setFormData] = useState({ id: '', pw: '', confirmPw: '' });
@@ -60,8 +61,13 @@ function Home() {
   }, []);
 
   useEffect(() => {
+    const saved = readJson(getRecentConversationsKey(), []);
+    if (Array.isArray(saved) && saved.length > 3) {
+      writeJson(getRecentConversationsKey(), saved.slice(0, 3));
+    }
     setRecentConversations(loadRecentConversations());
     setRestoredData(null);
+    setShareOpenData(null);
     setViewMode('main');
   }, [user?.id, user?.username]);
 
@@ -79,7 +85,10 @@ function Home() {
       return;
     }
 
-    if (menuName === '공유') setViewMode('공유');
+    if (menuName === '공유') {
+      setShareOpenData(null);
+      setViewMode('공유');
+    }
     else if (menuName === '분석 비교') setViewMode('분석 비교');
     else if (menuName === '내 프로젝트') setViewMode('내 프로젝트');
     else if (menuName === '마이페이지' || menuName === '프로필클릭') setViewMode('마이페이지');
@@ -150,6 +159,15 @@ function Home() {
     }
     setRestoredData(projectData);
     setViewMode('분석 비교');
+  };
+
+  const handleSharedProjectOpen = (projectData) => {
+    if (!isLoggedIn) {
+      setModalMode('recommend');
+      return;
+    }
+    setShareOpenData(projectData);
+    setViewMode('공유');
   };
 
   const handleRecentConversationClick = (conversation) => {
@@ -262,9 +280,20 @@ function Home() {
           </MainDashboard>
         )}
         
-        {viewMode === '내 프로젝트' && <Project onProjectRestore={handleProjectRestoreJump} />}
+        {viewMode === '내 프로젝트' && (
+          <Project
+            onProjectRestore={handleProjectRestoreJump}
+            onShareProjectOpen={handleSharedProjectOpen}
+          />
+        )}
         {viewMode === '마이페이지' && <MypageC onLogoutClick={handleAbsoluteLogout} />}
-        {viewMode === '공유' && <ShareC onRestoreTrigger={handleTimelineRestoreJump} username={user?.username} />}
+        {viewMode === '공유' && (
+          <ShareC
+            onRestoreTrigger={handleTimelineRestoreJump}
+            username={user?.username}
+            initialProject={shareOpenData}
+          />
+        )}
         {viewMode === '분석 비교' && <AnalysisC restoredData={restoredData} clearRestore={() => setRestoredData(null)} />}
         
         {/* ── 💡 분리된 모달을 한 곳에 주입하여 깔끔하게 통합 ── */}
