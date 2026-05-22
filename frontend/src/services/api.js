@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
+// 백엔드 주소를 직접 지정하거나, 환경변수가 있다면 그것을 사용하도록 수정
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -73,9 +74,6 @@ export const analysisAPI = {
   },
 };
 
-// 프로젝트 MongoDB 저장 API
-// 지금 화면은 아직 localStorage를 많이 쓰지만, 이 함수들을 통해 같은 데이터를
-// FastAPI + MongoDB에 저장하고 다시 불러오는 쪽으로 단계적으로 옮길 수 있습니다.
 export const projectAPI = {
   list: () => apiClient.get('/api/projects'),
   sync: (projects) => apiClient.put('/api/projects/sync', { projects }),

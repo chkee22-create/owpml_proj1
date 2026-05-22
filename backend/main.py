@@ -16,8 +16,6 @@ from app.routers.visuals import router as visuals_router
 app = FastAPI(title="PaperMate API")
 
 def _cors_origins() -> list[str]:
-    # 배포 주소가 정해지면 CORS_ORIGINS에 콤마로 추가합니다.
-    # 예: CORS_ORIGINS=https://papermate.example.com,http://192.168.0.10:8000
     configured = os.getenv("CORS_ORIGINS", "")
     defaults = [
         "http://localhost:3000",
@@ -30,8 +28,7 @@ def _cors_origins() -> list[str]:
     custom = [origin.strip() for origin in configured.split(",") if origin.strip()]
     return custom or defaults
 
-
-# CORS 설정: 개발 서버와 배포 주소 모두 허용할 수 있게 환경변수로 열어둡니다.
+# CORS 설정
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
@@ -41,10 +38,11 @@ app.add_middleware(
 )
 
 # 라우터 등록
+# auth_router는 이미 내부적으로 prefix="/api/auth"를 가지고 있으므로 바로 등록합니다.
 app.include_router(auth_router)
-app.include_router(analysis_router)
-app.include_router(projects_router)
-app.include_router(visuals_router)
+app.include_router(analysis_router, prefix="/api")
+app.include_router(projects_router, prefix="/api")
+app.include_router(visuals_router, prefix="/api")
 
 # 서버 시작 시 동작
 @app.on_event("startup")
@@ -56,9 +54,7 @@ async def health_check():
     db_status = await ping_database()
     return {"status": "ok", **db_status}
 
-
-# 배포 모드에서는 React build 결과를 FastAPI가 직접 서빙합니다.
-# 그래서 사용자는 http://서버주소:8000 하나만 열어도 화면과 API를 함께 사용할 수 있습니다.
+# 배포 모드: React build 결과 서빙
 frontend_build_dir = Path(
     os.getenv(
         "FRONTEND_BUILD_DIR",
@@ -73,6 +69,10 @@ if frontend_build_dir.exists():
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_react_app(full_path: str):
+        # docs 관련 경로는 API 문서 페이지를 위해 React로 보내지 않습니다.
+        if full_path in ["docs", "openapi.json", "redoc"]:
+            return {"message": "Use /docs for API documentation"}
+            
         requested_file = frontend_build_dir / full_path
         if full_path and requested_file.is_file():
             return FileResponse(requested_file)
