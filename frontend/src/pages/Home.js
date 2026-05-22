@@ -74,6 +74,7 @@ function Home() {
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [modalMode, setModalMode] = useState(null);
+  const [analysisSessionKey, setAnalysisSessionKey] = useState(() => `analysis-${Date.now()}`);
 
   const navigateToView = (nextView, options = {}) => {
     const { replace = false, clearRestoredData = false, clearShareOpenData = false } = options;
@@ -138,10 +139,16 @@ function Home() {
     }
 
     if (menuName === VIEW.SHARE) navigateToView(VIEW.SHARE, { clearShareOpenData: true });
-    else if (menuName === VIEW.ANALYSIS) navigateToView(VIEW.ANALYSIS);
+    else if (menuName === VIEW.ANALYSIS) {
+      setAnalysisSessionKey(`analysis-${Date.now()}`);
+      navigateToView(VIEW.ANALYSIS, { clearRestoredData: true });
+    }
     else if (menuName === VIEW.PROJECTS) navigateToView(VIEW.PROJECTS);
     else if (menuName === VIEW.MYPAGE || menuName === '프로필') navigateToView(VIEW.MYPAGE);
-    else if (menuName === '새 채팅') navigateToView(VIEW.ANALYSIS, { clearRestoredData: true });
+    else if (menuName === '새 채팅') {
+      setAnalysisSessionKey(`analysis-${Date.now()}`);
+      navigateToView(VIEW.ANALYSIS, { clearRestoredData: true });
+    }
   };
 
   const openLoginPopup = () => {
@@ -172,8 +179,13 @@ function Home() {
     setAuthError('');
 
     try {
-      if (mode === 'login') await login(usernameInput, passwordInput);
-      else await signup(usernameInput, passwordInput);
+      if (mode === 'login') {
+        await login(usernameInput, passwordInput);
+        window.alert('로그인되었습니다.');
+      } else {
+        await signup(usernameInput, passwordInput);
+        window.alert('회원가입이 완료되었습니다.');
+      }
       setModalMode(null);
       setFormData({ id: '', pw: '', confirmPw: '' });
     } catch (error) {
@@ -220,7 +232,9 @@ function Home() {
     const project = Array.isArray(projects)
       ? projects.find((item) => item.id === conversation.projectId || item.id === conversation.id)
       : null;
-    const thread = Array.isArray(project?.thread) ? project.thread : [];
+    const thread = Array.isArray(project?.thread)
+      ? project.thread
+      : (Array.isArray(conversation.thread) ? conversation.thread : []);
     const lastUserMessage = [...thread].reverse().find((item) => item.role === 'user');
     const lastAiMessage = [...thread].reverse().find((item) => item.role === 'ai' || item.role === 'asset');
 
@@ -238,6 +252,7 @@ function Home() {
       files: project?.files || [],
       thread,
     });
+    setAnalysisSessionKey(`analysis-${conversation.id || conversation.projectId || Date.now()}`);
     navigateToView(VIEW.ANALYSIS);
   };
 
@@ -333,7 +348,13 @@ function Home() {
         {viewMode === VIEW.SHARE && (
           <ShareC onRestoreTrigger={handleTimelineRestoreJump} username={user?.username} initialProject={shareOpenData} />
         )}
-        {viewMode === VIEW.ANALYSIS && <AnalysisC restoredData={restoredData} clearRestore={() => setRestoredData(null)} />}
+        {viewMode === VIEW.ANALYSIS && (
+          <AnalysisC
+            key={analysisSessionKey}
+            restoredData={restoredData}
+            clearRestore={() => setRestoredData(null)}
+          />
+        )}
 
         <AuthModal
           modalMode={modalMode}

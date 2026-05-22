@@ -1,6 +1,18 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || '';
+const getApiBaseUrl = () => {
+  if (process.env.REACT_APP_API_BASE_URL) {
+    return process.env.REACT_APP_API_BASE_URL;
+  }
+
+  if (typeof window !== 'undefined' && ['3000', '3001'].includes(window.location.port)) {
+    return `http://${window.location.hostname}:8000`;
+  }
+
+  return '';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -47,6 +59,17 @@ export const authAPI = {
 
   // 헬스 체크
   healthCheck: () => apiClient.get('/api/health'),
+
+  updateProfile: (username) =>
+    apiClient.patch('/api/auth/profile', { username }),
+
+  changePassword: (currentPassword, newPassword) =>
+    apiClient.patch('/api/auth/password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+
+  deleteAccount: () => apiClient.delete('/api/auth/account'),
 };
 
 export const analysisAPI = {

@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 def serialize_user(user) -> AuthUser:
-    return AuthUser(id=str(user["_id"]), username=user["username"])
+    return AuthUser(id=str(user["_id"]), username=user.get("display_name") or user["username"])
 
 
 def get_object_id(user_id: str) -> ObjectId:
@@ -38,6 +38,7 @@ async def signup(payload: SignupRequest):
 
     user_doc = {
         "username": username,
+        "display_name": username,
         "password_hash": hash_password(payload.password),
         "created_at": datetime.now(timezone.utc),
     }
@@ -78,12 +79,9 @@ async def update_profile(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다.")
 
-    if username != user["username"]:
-        try:
-            await db.users.update_one({"_id": object_id}, {"$set": {"username": username}})
-        except DuplicateKeyError as exc:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 사용 중인 닉네임입니다.") from exc
-        user["username"] = username
+    display_name = username
+    await db.users.update_one({"_id": object_id}, {"$set": {"display_name": display_name}})
+    user["display_name"] = display_name
 
     return serialize_user(user)
 

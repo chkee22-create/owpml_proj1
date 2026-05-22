@@ -13,7 +13,12 @@ from app.routers.auth import router as auth_router
 from app.routers.projects import router as projects_router
 from app.routers.visuals import router as visuals_router
 
-app = FastAPI(title="PaperMate API")
+app = FastAPI(
+    title="PaperMate API",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 def _cors_origins() -> list[str]:
     # 배포 주소가 정해지면 CORS_ORIGINS에 콤마로 추가합니다.
