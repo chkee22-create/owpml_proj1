@@ -26,9 +26,44 @@ export const ProfileCard = styled.div`
     background: #e2e8f0; margin-bottom: 15px;
     display: flex; align-items: center; justify-content: center;
     font-size: 40px; color: #94a3b8;
+    overflow: hidden;
+  }
+
+  .avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .avatar svg {
+    width: 40px;
+    height: 40px;
   }
 
   .username { font-size: 20px; font-weight: 800; margin-bottom: 20px; }
+
+  .feedback {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 12.5px;
+    font-weight: 700;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .feedback.success {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+  }
+
+  .feedback.error {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+  }
 
   .btn-full {
     width: 100%; padding: 12px; margin-bottom: 8px;
@@ -51,6 +86,7 @@ export const ProfileCard = styled.div`
   .bottom-btns {
     width: 100%; display: flex; gap: 10px; margin-top: 10px;
     button { flex: 1; padding: 10px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: 0.65; cursor: not-allowed; }
     .logout { background: #f1f5f9; }
     .withdraw { background: #fee2e2; color: #ef4444; }
   }

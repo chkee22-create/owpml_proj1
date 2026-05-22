@@ -1,10 +1,27 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { authAPI } from '../services/api';
-import { migrateCurrentUserStorage } from '../utils/storageKeys';
+import {
+  getProjectsKey,
+  getRecentConversationsKey,
+  getShareRoomKey,
+  migrateCurrentUserStorage,
+  readJson,
+  SHARED_PROJECTS_KEY,
+  SHARED_ROOM_PREFIX,
+  writeJson,
+} from '../utils/storageKeys';
 
 // React Context API로 로그인 상태를 앱 전체에서 공유합니다.
 // Home, Sidebar, 각 페이지는 useAuth()를 통해 현재 로그인 유저와 login/logout 함수를 가져옵니다.
 const AuthContext = createContext(null);
+
+const getProfileImageKey = (userId) => `profileImage:${userId}`;
+
+const clearSession = () => {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('username');
+  localStorage.removeItem('userId');
+};
 
 export const AuthProvider = ({ children }) => {
   // useState는 React의 상태 저장 기능입니다.
@@ -24,7 +41,11 @@ export const AuthProvider = ({ children }) => {
       // 로그인된 계정을 확인한 뒤, 예전 저장 데이터를 현재 계정 키로 한 번 이전합니다.
       migrateCurrentUserStorage();
       setIsLoggedIn(true);
-      setUser({ username, id: userId });
+      setUser({
+        username,
+        id: userId,
+        profileImage: localStorage.getItem(getProfileImageKey(userId)) || '',
+      });
     }
     setLoading(false);
   }, []);
@@ -38,6 +59,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('accessToken', access_token);
     localStorage.setItem('username', userData.username);
     localStorage.setItem('userId', userData.id);
+    userData.profileImage = localStorage.getItem(getProfileImageKey(userData.id)) || '';
 
     // userId가 저장된 다음 실행해야 계정별 저장소 키가 올바르게 만들어집니다.
     migrateCurrentUserStorage();
@@ -54,6 +76,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('accessToken', access_token);
     localStorage.setItem('username', userData.username);
     localStorage.setItem('userId', userData.id);
+    userData.profileImage = localStorage.getItem(getProfileImageKey(userData.id)) || '';
     migrateCurrentUserStorage();
 
     setIsLoggedIn(true);
@@ -63,9 +86,88 @@ export const AuthProvider = ({ children }) => {
   // 로그아웃은 인증 정보만 지웁니다.
   // 프로젝트/대화 데이터는 계정별 키에 남겨 두어 다음 로그인 때 다시 볼 수 있게 합니다.
   const logout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('username');
-    localStorage.removeItem('userId');
+    clearSession();
+    setIsLoggedIn(false);
+    setUser(null);
+  };
+
+  const clearCurrentUserLocalData = (currentUser) => {
+    if (!currentUser?.id) return;
+
+    const projects = readJson(getProjectsKey(), []);
+    const projectIds = new Set(Array.isArray(projects) ? projects.map((project) => project?.id).filter(Boolean) : []);
+
+    localStorage.removeItem(getProjectsKey());
+    localStorage.removeItem(getRecentConversationsKey());
+    localStorage.removeItem(getShareRoomKey());
+    localStorage.removeItem(getProfileImageKey(currentUser.id));
+
+    const sharedProjects = readJson(SHARED_PROJECTS_KEY, []);
+    if (Array.isArray(sharedProjects)) {
+      writeJson(
+        SHARED_PROJECTS_KEY,
+        sharedProjects.filter(
+          (project) => !projectIds.has(project?.id) && project?.owner !== currentUser.username
+        )
+      );
+    }
+
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(`${SHARED_ROOM_PREFIX}.`)) continue;
+
+      const room = readJson(key, null);
+      if (!room || typeof room !== 'object') continue;
+
+      writeJson(key, {
+        ...room,
+        members: Array.isArray(room.members)
+          ? room.members.filter((member) => member?.name !== currentUser.username)
+          : [],
+        comments: Array.isArray(room.comments)
+          ? room.comments.filter((comment) => comment?.user !== currentUser.username)
+          : [],
+        loadedProjectIds: Array.isArray(room.loadedProjectIds)
+          ? room.loadedProjectIds.filter((projectId) => !projectIds.has(projectId))
+          : [],
+      });
+    }
+  };
+
+  const updateProfile = async ({ username, profileImage }) => {
+    if (!user?.id) return null;
+
+    let nextUser = user;
+    const trimmedUsername = username?.trim();
+    if (trimmedUsername && trimmedUsername !== user.username) {
+      const response = await authAPI.updateProfile(trimmedUsername);
+      localStorage.setItem('username', response.data.username);
+      nextUser = { ...nextUser, ...response.data };
+    }
+
+    if (typeof profileImage === 'string') {
+      if (profileImage) {
+        localStorage.setItem(getProfileImageKey(user.id), profileImage);
+      } else {
+        localStorage.removeItem(getProfileImageKey(user.id));
+      }
+      nextUser = { ...nextUser, profileImage };
+    }
+
+    setUser(nextUser);
+    return nextUser;
+  };
+
+  const changePassword = async (currentPassword, newPassword) => {
+    await authAPI.changePassword(currentPassword, newPassword);
+  };
+
+  const withdrawAccount = async () => {
+    if (!user?.id) return;
+    const currentUser = user;
+    await authAPI.deleteAccount();
+    clearCurrentUserLocalData(currentUser);
+    clearSession();
     setIsLoggedIn(false);
     setUser(null);
   };
@@ -79,6 +181,9 @@ export const AuthProvider = ({ children }) => {
         login,
         signup,
         logout,
+        updateProfile,
+        changePassword,
+        withdrawAccount,
       }}
     >
       {children}

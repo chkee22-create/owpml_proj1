@@ -1,18 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import { RiRobot2Line } from 'react-icons/ri';
-import { FiChevronRight } from 'react-icons/fi';
-
-/* ── 💡 외부로 분리한 AuthModal 컴포넌트 임포트 ── */
+import { FiBarChart2, FiChevronRight, FiCopy, FiFileText, FiUsers } from 'react-icons/fi';
 import AuthModal from '../components/AuthModal';
-
-/* ── 서브 메뉴 페이지 컴포넌트 임포트 ── */
-import MypageC from './Mypage';       
-import ShareC from './Share';         
-import AnalysisC from './Analysis'; 
+import MypageC from './Mypage';
+import ShareC from './Share';
+import AnalysisC from './Analysis';
 import Project from './Project';
-
-/* ── 인증 상태 관리 ── */
 import { useAuth } from '../context/AuthContext';
 import {
   Container,
@@ -27,14 +21,51 @@ import {
 } from './styles/Home.styles';
 import { getProjectsKey, getRecentConversationsKey, readJson, writeJson } from '../utils/storageKeys';
 
+const VIEW = {
+  MAIN: 'main',
+  SHARE: '공유',
+  ANALYSIS: '분석 비교',
+  PROJECTS: '내 프로젝트',
+  MYPAGE: '마이페이지',
+};
+
+const VIEW_TO_ROUTE = {
+  [VIEW.MAIN]: 'home',
+  [VIEW.SHARE]: 'share',
+  [VIEW.ANALYSIS]: 'analysis',
+  [VIEW.PROJECTS]: 'projects',
+  [VIEW.MYPAGE]: 'mypage',
+};
+
+const ROUTE_TO_VIEW = Object.fromEntries(Object.entries(VIEW_TO_ROUTE).map(([view, route]) => [route, view]));
+
+const getViewFromLocation = () => {
+  const route = new URLSearchParams(window.location.search).get('view');
+  return ROUTE_TO_VIEW[route] || VIEW.MAIN;
+};
+
+const syncBrowserHistory = (view, replace = false) => {
+  const url = new URL(window.location.href);
+  const route = VIEW_TO_ROUTE[view] || VIEW_TO_ROUTE[VIEW.MAIN];
+
+  if (route === VIEW_TO_ROUTE[VIEW.MAIN]) url.searchParams.delete('view');
+  else url.searchParams.set('view', route);
+
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  const state = { ...(window.history.state || {}), papermateView: view };
+
+  if (replace) window.history.replaceState(state, '', nextUrl);
+  else window.history.pushState(state, '', nextUrl);
+};
+
 function Home() {
   const loadRecentConversations = () => {
     const parsed = readJson(getRecentConversationsKey(), []);
     return Array.isArray(parsed) ? parsed.slice(0, 3) : [];
   };
 
-  const { isLoggedIn, user, logout, login, signup } = useAuth();
-  const [viewMode, setViewMode] = useState('main'); 
+  const { isLoggedIn, user, logout, login, signup, loading } = useAuth();
+  const [viewMode, setViewMode] = useState(getViewFromLocation);
   const [restoredData, setRestoredData] = useState(null);
   const [shareOpenData, setShareOpenData] = useState(null);
   const [recentConversations, setRecentConversations] = useState(loadRecentConversations);
@@ -42,9 +73,33 @@ function Home() {
   const [formData, setFormData] = useState({ id: '', pw: '', confirmPw: '' });
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
-  
-  /* ── 분리된 AuthModal을 하나로 제어하기 위한 단일 상태 관리 모드 ── */
-  const [modalMode, setModalMode] = useState(null); // 'recommend', 'login', 'signup', null
+  const [modalMode, setModalMode] = useState(null);
+
+  const navigateToView = (nextView, options = {}) => {
+    const { replace = false, clearRestoredData = false, clearShareOpenData = false } = options;
+
+    if (clearRestoredData) setRestoredData(null);
+    if (clearShareOpenData) setShareOpenData(null);
+    setViewMode(nextView);
+    syncBrowserHistory(nextView, replace);
+  };
+
+  useEffect(() => {
+    syncBrowserHistory(viewMode, true);
+
+    const handlePopState = (event) => {
+      const nextView = event.state?.papermateView || getViewFromLocation();
+      setViewMode(nextView);
+      if (nextView === VIEW.MAIN) {
+        setRestoredData(null);
+        setShareOpenData(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const syncRecents = (event) => {
@@ -68,7 +123,8 @@ function Home() {
     setRecentConversations(loadRecentConversations());
     setRestoredData(null);
     setShareOpenData(null);
-    setViewMode('main');
+    navigateToView(VIEW.MAIN, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.username]);
 
   const handleInputChange = (event) => {
@@ -78,27 +134,25 @@ function Home() {
   };
 
   const handleMenuRouting = (menuName) => {
-    const protectedMenus = ['공유', '분석 비교', '내 프로젝트', '마이페이지', '프로필클릭'];
-    
+    const protectedMenus = [VIEW.SHARE, VIEW.ANALYSIS, VIEW.PROJECTS, VIEW.MYPAGE, '프로필'];
+
     if (!isLoggedIn && protectedMenus.includes(menuName)) {
-      setModalMode('recommend'); /* 비로그인 시 로그인 권유 모달 표시 */
+      setModalMode('recommend');
       return;
     }
 
-    if (menuName === '공유') {
-      setShareOpenData(null);
-      setViewMode('공유');
-    }
-    else if (menuName === '분석 비교') setViewMode('분석 비교');
-    else if (menuName === '내 프로젝트') setViewMode('내 프로젝트');
-    else if (menuName === '마이페이지' || menuName === '프로필클릭') setViewMode('마이페이지');
-    else if (menuName === '새 채팅') { setViewMode('분석 비교'); setRestoredData(null); }
+    if (menuName === VIEW.SHARE) navigateToView(VIEW.SHARE, { clearShareOpenData: true });
+    else if (menuName === VIEW.ANALYSIS) navigateToView(VIEW.ANALYSIS);
+    else if (menuName === VIEW.PROJECTS) navigateToView(VIEW.PROJECTS);
+    else if (menuName === VIEW.MYPAGE || menuName === '프로필') navigateToView(VIEW.MYPAGE);
+    else if (menuName === '새 채팅') navigateToView(VIEW.MAIN, { clearRestoredData: true });
   };
 
   const openLoginPopup = () => {
     setAuthError('');
     setModalMode('login');
   };
+
   const openSignupPopup = () => {
     setAuthError('');
     setModalMode('signup');
@@ -122,17 +176,12 @@ function Home() {
     setAuthError('');
 
     try {
-      if (mode === 'login') {
-        await login(usernameInput, passwordInput);
-      } else {
-        await signup(usernameInput, passwordInput);
-      }
+      if (mode === 'login') await login(usernameInput, passwordInput);
+      else await signup(usernameInput, passwordInput);
       setModalMode(null);
       setFormData({ id: '', pw: '', confirmPw: '' });
-      setAuthError('');
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || error.message || '서버와 연결할 수 없습니다.';
-      setAuthError(errorMessage);
+      setAuthError(error.response?.data?.detail || error.message || '서버와 연결할 수 없습니다.');
     } finally {
       setAuthLoading(false);
     }
@@ -140,7 +189,7 @@ function Home() {
 
   const handleAbsoluteLogout = () => {
     logout();
-    setViewMode('main'); 
+    navigateToView(VIEW.MAIN, { replace: true, clearRestoredData: true, clearShareOpenData: true });
   };
 
   const handleTimelineRestoreJump = (historyData) => {
@@ -149,7 +198,7 @@ function Home() {
       return;
     }
     setRestoredData(historyData);
-    setViewMode('분석 비교');
+    navigateToView(VIEW.ANALYSIS);
   };
 
   const handleProjectRestoreJump = (projectData) => {
@@ -158,7 +207,7 @@ function Home() {
       return;
     }
     setRestoredData(projectData);
-    setViewMode('분석 비교');
+    navigateToView(VIEW.ANALYSIS);
   };
 
   const handleSharedProjectOpen = (projectData) => {
@@ -167,26 +216,20 @@ function Home() {
       return;
     }
     setShareOpenData(projectData);
-    setViewMode('공유');
+    navigateToView(VIEW.SHARE);
   };
 
   const handleRecentConversationClick = (conversation) => {
-    const loadProjects = () => {
-      try {
-        const parsed = readJson(getProjectsKey(), []);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    };
-
-    const project = loadProjects().find((item) => item.id === conversation.projectId || item.id === conversation.id);
+    const projects = readJson(getProjectsKey(), []);
+    const project = Array.isArray(projects)
+      ? projects.find((item) => item.id === conversation.projectId || item.id === conversation.id)
+      : null;
     const thread = Array.isArray(project?.thread) ? project.thread : [];
     const lastUserMessage = [...thread].reverse().find((item) => item.role === 'user');
     const lastAiMessage = [...thread].reverse().find((item) => item.role === 'ai' || item.role === 'asset');
 
     if (!conversation.question && !project) {
-      setViewMode('분석 비교');
+      navigateToView(VIEW.ANALYSIS);
       return;
     }
 
@@ -199,10 +242,17 @@ function Home() {
       files: project?.files || [],
       thread,
     });
-    setViewMode('분석 비교');
+    navigateToView(VIEW.ANALYSIS);
   };
 
-  const isFullView = ['공유', '분석 비교', '내 프로젝트', '마이페이지'].includes(viewMode);
+  const isFullView = [VIEW.SHARE, VIEW.ANALYSIS, VIEW.PROJECTS, VIEW.MYPAGE].includes(viewMode);
+
+  useEffect(() => {
+    if (loading || isLoggedIn || !isFullView) return;
+    setModalMode('recommend');
+    navigateToView(VIEW.MAIN, { replace: true, clearRestoredData: true, clearShareOpenData: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, isLoggedIn, isFullView]);
 
   return (
     <Container>
@@ -216,13 +266,14 @@ function Home() {
       </SidebarOpenButton>
 
       <SidebarSlot $collapsed={isSidebarCollapsed}>
-        <Sidebar 
+        <Sidebar
           viewMode={viewMode}
           onMenuClick={handleMenuRouting}
-          onLogoClick={() => { setViewMode('main'); setRestoredData(null); }}
+          onLogoClick={() => navigateToView(VIEW.MAIN, { clearRestoredData: true, clearShareOpenData: true })}
           isLoggedIn={isLoggedIn}
           username={user?.username || 'Guest'}
-          onProfileClick={() => handleMenuRouting('프로필클릭')} 
+          userProfileImage={user?.profileImage || ''}
+          onProfileClick={() => handleMenuRouting('프로필')}
           collapsed={isSidebarCollapsed}
           onCollapse={() => setIsSidebarCollapsed(true)}
           recentConversations={recentConversations}
@@ -231,10 +282,6 @@ function Home() {
       </SidebarSlot>
 
       <MainContent $isFullView={isFullView} $sidebarCollapsed={isSidebarCollapsed}>
-        
-        {/* ❌ 중복되었던 대량의 모달 마크업들(RecommendBox, FigAuthBox 렌더링 블록)을 
-             여기가 아니라 하단 <AuthModal /> 하나로 통합하여 깔끔하게 제거했습니다. */}
-
         {!isFullView && (
           <TopAuth>
             {isLoggedIn ? (
@@ -247,63 +294,58 @@ function Home() {
             )}
           </TopAuth>
         )}
-        
-        {viewMode === 'main' && (
+
+        {viewMode === VIEW.MAIN && (
           <MainDashboard>
             {isSidebarCollapsed && (
-              <DashboardBrand onClick={() => setViewMode('main')}>
+              <DashboardBrand onClick={() => navigateToView(VIEW.MAIN)}>
                 <div className="logo"><RiRobot2Line /></div>
-                <div className="brand-text"><span>ChatBot AI</span>PaperMate</div>
+                <div className="brand-text"><span>ChatBot AI</span>Paper Mate</div>
               </DashboardBrand>
             )}
-            <h2>논문 읽는 시간을 1/10으로,<br />협업의 깊이는 2배로</h2>
-            <div className="sub">HWP, PDF 등 다양한 포맷의 논문을 올리면 AI가 핵심을 분석하고<br />팀원과 실시간으로 공유할 수 있어요.</div>
-            
+            <h2>논문 읽는 시간을 1/10로,<br />작업의 깊이는 2배로</h2>
+            <div className="sub">
+              HWP, PDF 등 다양한 형식의 논문을 올리면 AI가 핵심을 분석하고<br />
+              팀원과 실시간으로 공유할 수 있어요.
+            </div>
+
             <GridContainer>
-              <FeatureCard onClick={() => handleMenuRouting('분석 비교')}>
-                <div className="icon-box"><i className="fa-regular fa-file-lines"></i></div>
+              <FeatureCard onClick={() => handleMenuRouting(VIEW.ANALYSIS)}>
+                <div className="icon-box"><FiFileText /></div>
                 <div className="text-box"><h4>문서 분석 · 요약</h4><p>HWP, HWPX, PDF 문서의 핵심 내용을 추출하고 요약합니다.</p></div>
               </FeatureCard>
-              <FeatureCard onClick={() => handleMenuRouting('분석 비교')}>
-                <div className="icon-box"><i className="fa-regular fa-copy"></i></div>
+              <FeatureCard onClick={() => handleMenuRouting(VIEW.ANALYSIS)}>
+                <div className="icon-box"><FiCopy /></div>
                 <div className="text-box"><h4>다중문서 비교</h4><p>여러 문서를 비교하고 차이점을 시각화합니다.</p></div>
               </FeatureCard>
-              <FeatureCard onClick={() => handleMenuRouting('내 프로젝트')}>
-                <div className="icon-box"><i className="fa-solid fa-chart-simple"></i></div>
-                <div className="text-box"><h4>데이터 시각화</h4><p>문서 내 데이터를 차트, 그래프로 변환합니다.</p></div>
+              <FeatureCard onClick={() => handleMenuRouting(VIEW.PROJECTS)}>
+                <div className="icon-box"><FiBarChart2 /></div>
+                <div className="text-box"><h4>데이터 시각화</h4><p>문서 속 데이터를 차트와 그래프로 변환합니다.</p></div>
               </FeatureCard>
-              <FeatureCard onClick={() => handleMenuRouting('공유')}>
-                <div className="icon-box"><i className="fa-regular fa-user-group"></i></div>
-                <div className="text-box"><h4>협업공간</h4><p>초대 코드로 팀원을 초대하고, 분석 결과를 함께 검토합니다.</p></div>
+              <FeatureCard onClick={() => handleMenuRouting(VIEW.SHARE)}>
+                <div className="icon-box"><FiUsers /></div>
+                <div className="text-box"><h4>작업공간</h4><p>초대 코드로 팀원을 초대하고 분석 결과를 함께 검토합니다.</p></div>
               </FeatureCard>
             </GridContainer>
           </MainDashboard>
         )}
-        
-        {viewMode === '내 프로젝트' && (
-          <Project
-            onProjectRestore={handleProjectRestoreJump}
-            onShareProjectOpen={handleSharedProjectOpen}
-          />
+
+        {viewMode === VIEW.PROJECTS && (
+          <Project onProjectRestore={handleProjectRestoreJump} onShareProjectOpen={handleSharedProjectOpen} />
         )}
-        {viewMode === '마이페이지' && <MypageC onLogoutClick={handleAbsoluteLogout} />}
-        {viewMode === '공유' && (
-          <ShareC
-            onRestoreTrigger={handleTimelineRestoreJump}
-            username={user?.username}
-            initialProject={shareOpenData}
-          />
+        {viewMode === VIEW.MYPAGE && <MypageC onLogoutClick={handleAbsoluteLogout} />}
+        {viewMode === VIEW.SHARE && (
+          <ShareC onRestoreTrigger={handleTimelineRestoreJump} username={user?.username} initialProject={shareOpenData} />
         )}
-        {viewMode === '분석 비교' && <AnalysisC restoredData={restoredData} clearRestore={() => setRestoredData(null)} />}
-        
-        {/* ── 💡 분리된 모달을 한 곳에 주입하여 깔끔하게 통합 ── */}
-        <AuthModal 
-          modalMode={modalMode} 
-          setModalMode={setModalMode} 
+        {viewMode === VIEW.ANALYSIS && <AnalysisC restoredData={restoredData} clearRestore={() => setRestoredData(null)} />}
+
+        <AuthModal
+          modalMode={modalMode}
+          setModalMode={setModalMode}
           formData={formData}
           onInputChange={handleInputChange}
-          onLoginSubmit={() => submitAuthRequest('login')} 
-          onSignupSubmit={() => submitAuthRequest('signup')} 
+          onLoginSubmit={() => submitAuthRequest('login')}
+          onSignupSubmit={() => submitAuthRequest('signup')}
           authError={authError}
           authLoading={authLoading}
         />

@@ -14,48 +14,78 @@ import { RiRobot2Line } from 'react-icons/ri';
 import { palette } from '../shared/palette';
 
 const SidebarContainer = styled.aside`
-  width: clamp(220px, 22vw, 260px); height: 100vh; 
-  background: #c8e6c9; 
+  width: clamp(220px, 22vw, 260px);
+  height: 100vh;
+  background: #c8e6c9;
   border-right: 1px solid #e2e8f0;
-  display: flex; flex-direction: column; 
+  display: flex;
+  flex-direction: column;
   padding: 28px 16px;
-  box-sizing: border-box; justify-content: space-between; flex-shrink: 0;
-  transform: ${props => props.$collapsed ? 'translateX(-100%)' : 'translateX(0)'};
+  box-sizing: border-box;
+  justify-content: space-between;
+  flex-shrink: 0;
+  transform: ${(props) => (props.$collapsed ? 'translateX(-100%)' : 'translateX(0)')};
   transition: transform 0.22s ease;
 `;
 
 const TopBrandSection = styled.div`
-  display: flex; align-items: center; gap: 10px; margin-bottom: 32px; padding-left: 8px;
-  cursor: pointer; 
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+  padding-left: 8px;
+  cursor: pointer;
   transition: opacity 0.15s;
-  &:hover { opacity: 0.85; }
 
-  .logo { 
-    width: 32px; height: 32px; 
-    background: #0ea5a4;
-    border-radius: 8px; color: white; 
-    display: flex; align-items: center; justify-content: center;
-    
-    svg { width: 20px; height: 20px; color: #ffffff; }
+  &:hover {
+    opacity: 0.85;
   }
-  
-  .brand-text { 
-    font-size: 16px; font-weight: 800; 
+
+  .logo {
+    width: 32px;
+    height: 32px;
+    background: #0ea5a4;
+    border-radius: 8px;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .logo svg {
+    width: 20px;
+    height: 20px;
+    color: #ffffff;
+  }
+
+  .brand-text {
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.15;
     color: #1e293b;
-    span { 
-      display: block; font-size: 10px; 
-      color: #94a3b8; font-weight: 700; margin-bottom: -2px; 
-    } 
+  }
+
+  .brand-text span {
+    display: block;
+    font-size: 10px;
+    color: #94a3b8;
+    font-weight: 700;
+    margin-bottom: 1px;
   }
 `;
 
 const NavList = styled.nav`
-  display: flex; flex-direction: column; gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   flex: 1;
   min-height: 0;
-  
-  .section-lbl { 
-    font-size: 11px; font-weight: 800;
+
+  .section-lbl {
+    font-size: 11px;
+    font-weight: 800;
     color: #78909c;
     margin: 20px 0 6px 12px;
     letter-spacing: 0.5px;
@@ -69,7 +99,7 @@ const NavIcon = styled.span`
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: ${props => props.$active ? '#0ea5a4' : palette.slate[5]};
+  color: ${(props) => (props.$active ? '#0ea5a4' : palette.slate[5])};
   transition: color 0.15s;
 
   svg {
@@ -111,31 +141,30 @@ const CollapseButton = styled.button`
 `;
 
 const MenuBtn = styled.div`
-  display: flex; align-items: center; gap: 12px; padding: 11px 14px; 
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
   border-radius: 8px;
-  font-size: 14px; font-weight: 700; 
+  font-size: 14px;
+  font-weight: 700;
   box-sizing: border-box;
-  
-  color: ${props => props.$active ? '#0ea5a4' : '#475569'}; 
-  background: ${props => props.$active ? '#ffffff' : 'transparent'}; 
-  border: 1px solid ${props => props.$active ? 'rgba(15, 23, 42, 0.04)' : 'transparent'};
-  box-shadow: ${props => props.$active ? '0 4px 12px rgba(15, 23, 42, 0.04)' : 'none'};
-  
-  cursor: pointer; transition: all 0.15s ease-in-out;
-  
-  &:hover { 
-    background: ${props => props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.4)'};
-    color: #0ea5a4; 
-    
+  color: ${(props) => (props.$active ? '#0ea5a4' : '#475569')};
+  background: ${(props) => (props.$active ? '#ffffff' : 'transparent')};
+  border: 1px solid ${(props) => (props.$active ? 'rgba(15, 23, 42, 0.04)' : 'transparent')};
+  box-shadow: ${(props) => (props.$active ? '0 4px 12px rgba(15, 23, 42, 0.04)' : 'none')};
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+
+  &:hover {
+    background: ${(props) => (props.$active ? '#ffffff' : 'rgba(255, 255, 255, 0.4)')};
+    color: #0ea5a4;
+
     ${NavIcon} {
       color: #0ea5a4;
     }
   }
-  
-  ${NavIcon} { 
-    color: ${props => props.$active ? '#0ea5a4' : palette.slate[5]}; 
-  }
-  
+
   .menu-text {
     flex: 1;
     overflow: hidden;
@@ -145,36 +174,56 @@ const MenuBtn = styled.div`
 `;
 
 const BottomUserCard = styled.div`
-  display: flex; align-items: center; gap: 10px; 
-  padding: 12px; 
-  border-radius: 10px; cursor: pointer; transition: all 0.15s; margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-top: auto;
   border: 1px solid transparent;
   box-sizing: border-box;
 
-  .profile-circle { 
-    width: 32px; height: 32px; 
-    border-radius: 50%; 
-    display: flex; align-items: center; justify-content: center; 
-    
-    .account-icon {
-      width: 32px;
-      height: 32px;
-      color: ${palette.slate[5]};
-    }
+  &:hover {
+    background: rgba(255, 255, 255, 0.38);
   }
-  
-  .name { 
+
+  .profile-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .account-icon {
+    width: 32px;
+    height: 32px;
+    color: ${palette.slate[5]};
+  }
+
+  img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .name {
     font-size: 13.5px;
-    font-weight: 700; 
+    font-weight: 700;
     color: #1e293b;
-    flex: 1; 
+    flex: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
-  .gear-icon { 
-    color: #546e7a; 
+
+  .gear-icon {
+    color: #546e7a;
     width: 16px;
     height: 16px;
   }
@@ -190,6 +239,7 @@ function Sidebar({
   onLogoClick,
   isLoggedIn,
   username,
+  userProfileImage,
   onProfileClick,
   collapsed,
   onCollapse,
@@ -200,13 +250,13 @@ function Sidebar({
 
   return (
     <SidebarContainer $collapsed={collapsed}>
-      <div style={{display:'flex', flexDirection:'column', width:'100%'}}>
+      <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
         <BrandRow>
           <TopBrandSection onClick={onLogoClick}>
             <div className="logo"><RiRobot2Line /></div>
-            <div className="brand-text"><span>ChatBot AI</span>PaperMate</div>
+            <div className="brand-text"><span>ChatBot AI</span>Paper Mate</div>
           </TopBrandSection>
-          <CollapseButton type="button" onClick={onCollapse} aria-label="사이드바 숨기기">
+          <CollapseButton type="button" onClick={onCollapse} aria-label="사이드바 접기">
             <FiChevronLeft />
           </CollapseButton>
         </BrandRow>
@@ -214,7 +264,7 @@ function Sidebar({
         <NavList>
           <MenuBtn $active={viewMode === 'main'} onClick={() => onMenuClick('새 채팅')}>
             <SidebarIcon active={viewMode === 'main'}><TbMessagePlus /></SidebarIcon>
-            <span className="menu-text">새로운 채팅</span>
+            <span className="menu-text">새 채팅</span>
           </MenuBtn>
 
           {isLoggedIn && (
@@ -239,14 +289,16 @@ function Sidebar({
               ))}
             </>
           )}
-          <div style={{height:'1px', background:'rgba(15, 23, 42, 0.08)', margin:'16px 0'}} />
+
+          <div style={{ height: '1px', background: 'rgba(15, 23, 42, 0.08)', margin: '16px 0' }} />
+
           <MenuBtn $active={viewMode === '분석 비교'} onClick={() => onMenuClick('분석 비교')}>
             <SidebarIcon active={viewMode === '분석 비교'}><FiPieChart /></SidebarIcon>
-            <span className="menu-text">분석.요약</span>
+            <span className="menu-text">분석 · 요약</span>
           </MenuBtn>
           <MenuBtn $active={viewMode === '내 프로젝트'} onClick={() => onMenuClick('내 프로젝트')}>
             <SidebarIcon active={viewMode === '내 프로젝트'}><FiFolder /></SidebarIcon>
-            <span className="menu-text">프로젝트</span>
+            <span className="menu-text">내 프로젝트</span>
           </MenuBtn>
           <MenuBtn $active={viewMode === '공유'} onClick={() => onMenuClick('공유')}>
             <SidebarIcon active={viewMode === '공유'}><FiShare2 /></SidebarIcon>
@@ -256,16 +308,16 @@ function Sidebar({
       </div>
 
       {isLoggedIn && (
-        <BottomUserCard>
+        <BottomUserCard onClick={onProfileClick}>
           <div className="profile-circle">
-            <FiUser className="account-icon" />
+            {userProfileImage ? (
+              <img src={userProfileImage} alt={`${username} 프로필`} />
+            ) : (
+              <FiUser className="account-icon" />
+            )}
           </div>
           <div className="name">{username}</div>
-          <FiSettings 
-            className="gear-icon" 
-            onClick={onProfileClick} 
-            style={{ cursor: 'pointer' }} 
-          />
+          <FiSettings className="gear-icon" />
         </BottomUserCard>
       )}
     </SidebarContainer>

@@ -72,7 +72,13 @@ const compactSharedProjects = (projects) =>
 // userId 또는 username을 키 뒤에 붙여서 계정별 저장 공간을 분리합니다.
 // 예: papermate.projects.v1.3, papermate.projects.v1.user14530
 const getUserScope = () => {
-  return 'test-everyone';
+  try {
+    const userId = localStorage.getItem('userId');
+    const username = localStorage.getItem('username');
+    return encodeURIComponent(userId || username || 'guest');
+  } catch {
+    return 'guest';
+  }
 };
 
 export const scopedKey = (baseKey) => `${baseKey}.${getUserScope()}`;
@@ -115,15 +121,6 @@ export const writeJson = (key, value) => {
 };
 
 // 마이그레이션할 값이 실제로 비어 있지 않은지 확인하는 보조 함수입니다.
-const hasStoredData = (value) => {
-  if (Array.isArray(value)) return value.length > 0;
-  if (!value || typeof value !== 'object') return false;
-  return Object.values(value).some((item) => {
-    if (Array.isArray(item)) return item.length > 0;
-    return Boolean(item);
-  });
-};
-
 // 초대코드 입력으로 프로젝트를 찾기 위한 전역 인덱스입니다.
 // 개인 프로젝트 저장소와 별도로, inviteCode가 있는 프로젝트만 모아서 저장합니다.
 const mergeProjectsIntoSharedIndex = (projects) => {
@@ -145,39 +142,11 @@ const mergeProjectsIntoSharedIndex = (projects) => {
 // 예전 버전에서 저장한 키를 현재 로그인 계정의 새 키로 한 번만 옮깁니다.
 // 이미 다른 계정으로 이전된 데이터는 다시 복사하지 않도록 migratedTo 표시를 남깁니다.
 // TODO: 배포 전에는 반드시 계정별 스코프(getUserScope)로 복구할 것!
-const migrateJsonIfTargetEmpty = (sourceKey, targetKey, fallback) => {
-  if (sourceKey === targetKey) return;
-
-  const migratedMarkerKey = `${sourceKey}.migratedTo`;
-  const migratedTo = localStorage.getItem(migratedMarkerKey);
-  if (migratedTo && migratedTo !== targetKey) return;
-
-  const currentValue = readJson(targetKey, fallback);
-  if (hasStoredData(currentValue)) {
-    if (!migratedTo) localStorage.setItem(migratedMarkerKey, targetKey);
-    return;
-  }
-
-  const sourceValue = readJson(sourceKey, fallback);
-  if (!hasStoredData(sourceValue)) return;
-
-  writeJson(targetKey, sourceValue);
-  localStorage.setItem(migratedMarkerKey, targetKey);
-};
-
 // 로그인 직후 호출됩니다.
 // 목적: 예전 작업물이 "사라진 것처럼 보이는" 문제를 막고, 현재 계정 저장소로 안전하게 옮기기.
 export const migrateCurrentUserStorage = () => {
+  if (!localStorage.getItem('userId')) return;
+
   const projectsKey = getProjectsKey();
-  const recentConversationsKey = getRecentConversationsKey();
-  const shareRoomKey = getShareRoomKey();
-
-  migrateJsonIfTargetEmpty(BASE_PROJECTS_KEY, projectsKey, []);
-  migrateJsonIfTargetEmpty(`${BASE_PROJECTS_KEY}.guest`, projectsKey, []);
-  migrateJsonIfTargetEmpty(BASE_RECENT_CONVERSATIONS_KEY, recentConversationsKey, []);
-  migrateJsonIfTargetEmpty(`${BASE_RECENT_CONVERSATIONS_KEY}.guest`, recentConversationsKey, []);
-  migrateJsonIfTargetEmpty(BASE_SHARE_ROOM_KEY, shareRoomKey, {});
-  migrateJsonIfTargetEmpty(`${BASE_SHARE_ROOM_KEY}.guest`, shareRoomKey, {});
-
   mergeProjectsIntoSharedIndex(readJson(projectsKey, []));
 };

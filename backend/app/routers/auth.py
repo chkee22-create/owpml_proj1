@@ -1,17 +1,34 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from bson import ObjectId
+from fastapi import APIRouter, Depends, HTTPException, status
 from pymongo.errors import DuplicateKeyError
 
-# 수정된 경로에 따른 import 최적화
 from app.core.database import db
+from app.core.deps import get_current_user_id
 from app.core.security import create_access_token, hash_password, verify_password
-from models.schemas import AuthResponse, AuthUser, LoginRequest, SignupRequest
+from models.schemas import (
+    AuthResponse,
+    AuthUser,
+    LoginRequest,
+    PasswordChangeRequest,
+    ProfileUpdateRequest,
+    SignupRequest,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+
 def serialize_user(user) -> AuthUser:
     return AuthUser(id=str(user["_id"]), username=user["username"])
+
+
+def get_object_id(user_id: str) -> ObjectId:
+    try:
+        return ObjectId(user_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="유효하지 않은 사용자입니다.") from exc
+
 
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def signup(payload: SignupRequest):
@@ -34,6 +51,7 @@ async def signup(payload: SignupRequest):
     token = create_access_token(str(result.inserted_id))
     return AuthResponse(access_token=token, user=serialize_user(user_doc))
 
+
 @router.post("/login", response_model=AuthResponse)
 async def login(payload: LoginRequest):
     username = payload.username.strip()
@@ -44,3 +62,57 @@ async def login(payload: LoginRequest):
 
     token = create_access_token(str(user["_id"]))
     return AuthResponse(access_token=token, user=serialize_user(user))
+
+
+@router.patch("/profile", response_model=AuthUser)
+async def update_profile(
+    payload: ProfileUpdateRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    username = payload.username.strip()
+    if not username:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="닉네임을 입력해주세요.")
+
+    object_id = get_object_id(user_id)
+    user = await db.users.find_one({"_id": object_id})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다.")
+
+    if username != user["username"]:
+        try:
+            await db.users.update_one({"_id": object_id}, {"$set": {"username": username}})
+        except DuplicateKeyError as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 사용 중인 닉네임입니다.") from exc
+        user["username"] = username
+
+    return serialize_user(user)
+
+
+@router.patch("/password")
+async def change_password(
+    payload: PasswordChangeRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    object_id = get_object_id(user_id)
+    user = await db.users.find_one({"_id": object_id})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다.")
+
+    if not verify_password(payload.current_password, user["password_hash"]):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="현재 비밀번호가 올바르지 않습니다.")
+
+    await db.users.update_one(
+        {"_id": object_id},
+        {"$set": {"password_hash": hash_password(payload.new_password)}},
+    )
+    return {"message": "비밀번호가 변경되었습니다."}
+
+
+@router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(user_id: str = Depends(get_current_user_id)):
+    object_id = get_object_id(user_id)
+    result = await db.users.delete_one({"_id": object_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다.")
+
+    await db.projects.delete_many({"user_id": user_id})

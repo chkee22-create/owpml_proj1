@@ -106,7 +106,7 @@ export const MainDashboard = styled.div`
 
 export const DashboardBrand = styled.div`
   position: absolute;
-  top: 28px;
+  top: -30px;
   left: 28px;
   display: flex;
   align-items: center;
@@ -126,6 +126,7 @@ export const DashboardBrand = styled.div`
   .logo svg {
     width: 22px;
     height: 22px;
+    display: block;
   }
 
   .brand-text {
@@ -144,7 +145,7 @@ export const DashboardBrand = styled.div`
   }
 
   @media (max-width: 560px) {
-    top: 20px;
+    top: -20px;
     left: 20px;
 
     .brand-text {

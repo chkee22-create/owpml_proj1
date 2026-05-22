@@ -29,6 +29,7 @@ apiClient.interceptors.response.use(
       localStorage.removeItem('accessToken');
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('username');
+      localStorage.removeItem('userId');
       window.location.reload();
     }
     return Promise.reject(error);
@@ -44,6 +45,17 @@ export const authAPI = {
   // 로그인
   login: (username, password) =>
     apiClient.post('/api/auth/login', { username, password }),
+
+  updateProfile: (username) =>
+    apiClient.patch('/api/auth/profile', { username }),
+
+  changePassword: (currentPassword, newPassword) =>
+    apiClient.patch('/api/auth/password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+
+  deleteAccount: () => apiClient.delete('/api/auth/account'),
 
   // 헬스 체크
   healthCheck: () => apiClient.get('/api/health'),
