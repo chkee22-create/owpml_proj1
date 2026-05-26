@@ -142,8 +142,7 @@ function Home() {
     else if (menuName === VIEW.ANALYSIS) {
       setAnalysisSessionKey(`analysis-${Date.now()}`);
       navigateToView(VIEW.ANALYSIS, { clearRestoredData: true });
-    }
-    else if (menuName === VIEW.PROJECTS) navigateToView(VIEW.PROJECTS);
+    } else if (menuName === VIEW.PROJECTS) navigateToView(VIEW.PROJECTS);
     else if (menuName === VIEW.MYPAGE || menuName === '프로필') navigateToView(VIEW.MYPAGE);
     else if (menuName === '새 채팅') {
       setAnalysisSessionKey(`analysis-${Date.now()}`);
@@ -323,19 +322,31 @@ function Home() {
             <GridContainer>
               <FeatureCard onClick={() => handleMenuRouting(VIEW.ANALYSIS)}>
                 <div className="icon-box"><FiFileText /></div>
-                <div className="text-box"><h4>문서 분석 · 요약</h4><p>HWP, HWPX, PDF 문서의 핵심 내용을 추출하고 요약합니다.</p></div>
+                <div className="text-box">
+                  <h4>문서 분석 · 요약</h4>
+                  <p>HWP, HWPX, PDF 문서의 핵심 내용을 추출하고 요약합니다.</p>
+                </div>
               </FeatureCard>
               <FeatureCard onClick={() => handleMenuRouting(VIEW.ANALYSIS)}>
                 <div className="icon-box"><FiCopy /></div>
-                <div className="text-box"><h4>다중문서 비교</h4><p>여러 문서를 비교하고 차이점을 시각화합니다.</p></div>
+                <div className="text-box">
+                  <h4>다중문서 비교</h4>
+                  <p>여러 문서를 비교하고 차이점을 시각화합니다.</p>
+                </div>
               </FeatureCard>
               <FeatureCard onClick={() => handleMenuRouting(VIEW.PROJECTS)}>
                 <div className="icon-box"><FiBarChart2 /></div>
-                <div className="text-box"><h4>데이터 시각화</h4><p>문서 속 데이터를 차트와 그래프로 변환합니다.</p></div>
+                <div className="text-box">
+                  <h4>데이터 시각화</h4>
+                  <p>문서 속 데이터를 차트와 그래프로 변환합니다.</p>
+                </div>
               </FeatureCard>
               <FeatureCard onClick={() => handleMenuRouting(VIEW.SHARE)}>
                 <div className="icon-box"><FiUsers /></div>
-                <div className="text-box"><h4>작업공간</h4><p>초대 코드로 팀원을 초대하고 분석 결과를 함께 검토합니다.</p></div>
+                <div className="text-box">
+                  <h4>작업공간</h4>
+                  <p>초대 코드로 팀원을 초대하고 분석 결과를 함께 검토합니다.</p>
+                </div>
               </FeatureCard>
             </GridContainer>
           </MainDashboard>
