@@ -221,12 +221,12 @@ function AnalysisC({ projectId, projectTitle, restoredData, onConversationChange
   };
 
   const copyInviteCode = async () => {
-    if (!currentInviteCode || currentInviteCode === '?? ? ??') {
-      window.alert('????? ???? ????? ?????.');
+    if (!currentInviteCode || currentInviteCode === '저장 후 생성') {
+      window.alert('프로젝트를 저장하면 초대코드가 생성됩니다.');
       return;
     }
     await navigator.clipboard?.writeText(currentInviteCode);
-    window.alert(`????? ???????: ${currentInviteCode}`);
+    window.alert(`초대코드가 복사되었습니다: ${currentInviteCode}`);
   };
 
   const handleFileChange = (event) => {
@@ -235,14 +235,12 @@ function AnalysisC({ projectId, projectTitle, restoredData, onConversationChange
 
     const nextFiles = [...files, ...selectedFiles];
     setFiles(nextFiles);
-    ensureRecentConversationForFiles(nextFiles);
     event.target.value = '';
   };
 
   const handleRemoveFile = (file) => {
     const nextFiles = files.filter((item) => getFileKey(item) !== getFileKey(file));
     setFiles(nextFiles);
-    ensureRecentConversationForFiles(nextFiles);
   };
 
   const upsertRecentConversation = (nextMessages, question, nextFiles = files) => {
@@ -255,7 +253,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, onConversationChange
       restoredData?.projectTitle ||
       question ||
       nextFiles[0]?.name?.replace(/\.[^.]+$/, '') ||
-      '? ?? ??';
+      '새 분석 대화';
 
     writeJson(recentConversationsKey, [
       {
@@ -280,25 +278,6 @@ function AnalysisC({ projectId, projectTitle, restoredData, onConversationChange
     ].slice(0, MAX_RECENT_CONVERSATIONS));
   };
 
-  const ensureRecentConversationForFiles = (nextFiles) => {
-    const fileNames = nextFiles.map((file) => file.name).filter(Boolean).join(', ');
-    const hasSystemFileMessage = messages.some((message) => message.id === 'uploaded-files');
-    const fileMessage = {
-      id: 'uploaded-files',
-      role: 'system',
-      text: nextFiles.length > 0 ? `???? ??: ${fileNames}` : '???? ??? ????.',
-    };
-    const nextMessages = hasSystemFileMessage
-      ? messages.map((message) => (message.id === 'uploaded-files' ? fileMessage : message))
-      : [...messages, fileMessage];
-
-    setMessages(nextMessages);
-    upsertRecentConversation(nextMessages, fileNames || '?? ???', nextFiles);
-    if (typeof onConversationChange === 'function') {
-      onConversationChange(effectiveProjectId || recentConversationIdRef.current);
-    }
-  };
-
   const handleSendMessage = async () => {
     const nextQuestion = promptText.trim();
     if (!nextQuestion && files.length === 0) {
@@ -308,12 +287,19 @@ function AnalysisC({ projectId, projectTitle, restoredData, onConversationChange
 
     const question = nextQuestion || '업로드한 문서를 요약해줘';
     setPromptText('');
+
+    const fileNames = files.map((file) => file.name).filter(Boolean).join(', ');
+    const fileMessage = files.length > 0
+      ? { id: `uploaded-files-${Date.now()}`, role: 'system', text: `업로드된 파일: ${fileNames}` }
+      : null;
     const userMessage = { id: `user-${Date.now()}`, role: 'user', text: question };
-    const messagesWithQuestion = [...messages, userMessage];
+    const messagesWithQuestion = [...messages, ...(fileMessage ? [fileMessage] : []), userMessage];
     const isNewConversation = recentConversationIdRef.current.startsWith('conversation-');
+
     if (isNewConversation) {
       recentConversationIdRef.current = `conv-${Date.now()}`;
     }
+
     setMessages(messagesWithQuestion);
     upsertRecentConversation(messagesWithQuestion, question);
     if (isNewConversation && typeof onConversationChange === 'function') {
