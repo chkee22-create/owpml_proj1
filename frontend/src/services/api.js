@@ -1,7 +1,18 @@
 import axios from 'axios';
 
-// 백엔드 주소를 직접 지정하거나, 환경변수가 있다면 그것을 사용하도록 수정
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8000';
+const getApiBaseUrl = () => {
+  if (process.env.REACT_APP_API_BASE_URL) {
+    return process.env.REACT_APP_API_BASE_URL;
+  }
+
+  if (typeof window !== 'undefined' && ['3000', '3001'].includes(window.location.port)) {
+    return `http://${window.location.hostname}:8000`;
+  }
+
+  return '';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -48,6 +59,17 @@ export const authAPI = {
 
   // 헬스 체크
   healthCheck: () => apiClient.get('/api/health'),
+
+  updateProfile: (username) =>
+    apiClient.patch('/api/auth/profile', { username }),
+
+  changePassword: (currentPassword, newPassword) =>
+    apiClient.patch('/api/auth/password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+
+  deleteAccount: () => apiClient.delete('/api/auth/account'),
 };
 
 export const analysisAPI = {
@@ -74,6 +96,9 @@ export const analysisAPI = {
   },
 };
 
+// 프로젝트 MongoDB 저장 API
+// 지금 화면은 아직 localStorage를 많이 쓰지만, 이 함수들을 통해 같은 데이터를
+// FastAPI + MongoDB에 저장하고 다시 불러오는 쪽으로 단계적으로 옮길 수 있습니다.
 export const projectAPI = {
   list: () => apiClient.get('/api/projects'),
   sync: (projects) => apiClient.put('/api/projects/sync', { projects }),

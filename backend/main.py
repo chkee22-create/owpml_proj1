@@ -13,7 +13,12 @@ from app.routers.auth import router as auth_router
 from app.routers.projects import router as projects_router
 from app.routers.visuals import router as visuals_router
 
-app = FastAPI(title="PaperMate API")
+app = FastAPI(
+    title="PaperMate API",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 def _cors_origins() -> list[str]:
     configured = os.getenv("CORS_ORIGINS", "")
