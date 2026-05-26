@@ -143,6 +143,7 @@ const buildVisualAsset = (type, files, messages) => {
 
 function AnalysisC({ projectId, projectTitle, restoredData, onConversationChange }) {
   const fileInputRef = useRef(null);
+  const promptInputRef = useRef(null);
   const scrollRef = useRef(null);
   const recentConversationIdRef = useRef(
     restoredData?.conversationId || restoredData?.projectId || projectId || `conversation-${Date.now()}`
@@ -236,11 +237,21 @@ function AnalysisC({ projectId, projectTitle, restoredData, onConversationChange
     const nextFiles = [...files, ...selectedFiles];
     setFiles(nextFiles);
     event.target.value = '';
+    window.setTimeout(() => promptInputRef.current?.focus(), 0);
   };
 
   const handleRemoveFile = (file) => {
     const nextFiles = files.filter((item) => getFileKey(item) !== getFileKey(file));
     setFiles(nextFiles);
+  };
+
+  const handlePromptEnter = (event) => {
+    if (event.key !== 'Enter' || event.nativeEvent?.isComposing) return;
+    if (event.target?.closest?.('.remove-file')) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    handleSendMessage();
   };
 
   const upsertRecentConversation = (nextMessages, question, nextFiles = files) => {
@@ -733,7 +744,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, onConversationChange
             {isAnalyzing && <AiRow><div className="ai-box">GPT가 문서를 분석하고 있습니다...</div></AiRow>}
           </StreamMessageArea>
 
-          <BottomPromptInput>
+          <BottomPromptInput onKeyDownCapture={handlePromptEnter}>
             {files.length > 0 && (
               <div className="file-island-list" aria-label="업로드된 파일 목록">
                 {files.map((file) => (
@@ -764,14 +775,10 @@ function AnalysisC({ projectId, projectTitle, restoredData, onConversationChange
                 <i className="fa-solid fa-paperclip"></i>
               </button>
               <input
+                ref={promptInputRef}
                 value={promptText}
                 placeholder={files.length > 0 ? `${files.length}개 파일 기준으로 질문을 입력하세요...` : '분석 질문을 입력하세요...'}
                 onChange={(event) => setPromptText(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter' || event.nativeEvent?.isComposing) return;
-                  event.preventDefault();
-                  handleSendMessage();
-                }}
               />
               <button type="button" onClick={handleSendMessage}>전송</button>
             </div>

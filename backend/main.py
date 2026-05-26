@@ -45,9 +45,9 @@ app.add_middleware(
 # 라우터 등록
 # auth_router는 이미 내부적으로 prefix="/api/auth"를 가지고 있으므로 바로 등록합니다.
 app.include_router(auth_router)
-app.include_router(analysis_router, prefix="/api")
-app.include_router(projects_router, prefix="/api")
-app.include_router(visuals_router, prefix="/api")
+app.include_router(analysis_router)
+app.include_router(projects_router)
+app.include_router(visuals_router)
 
 # 서버 시작 시 동작
 @app.on_event("startup")
