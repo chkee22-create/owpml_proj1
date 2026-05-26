@@ -1,9 +1,12 @@
 // @ts-nocheck
+// TypeScript 변경 표시: JSX가 없는 유틸/API 파일이라 .js에서 .ts로 바꾼 파일입니다.
+// TypeScript 변경 표시: 기존 동작은 유지하고, 이후 함수 인자/반환 타입을 점진적으로 붙일 수 있습니다.
 // 초보자 안내: 프론트엔드에서 백엔드 API를 호출할 때 공통으로 사용하는 axios 설정 파일입니다.
 
 import axios from 'axios';
 
 const getApiBaseUrl = () => {
+  // TypeScript 변경 표시: Vite에서는 CRA의 process.env 대신 import.meta.env로 환경변수를 읽습니다.
   const configuredUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL;
 
   if (configuredUrl) {

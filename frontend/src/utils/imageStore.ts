@@ -1,4 +1,6 @@
 // @ts-nocheck
+// TypeScript 변경 표시: JSX가 없는 유틸/API 파일이라 .js에서 .ts로 바꾼 파일입니다.
+// TypeScript 변경 표시: 기존 동작은 유지하고, 이후 함수 인자/반환 타입을 점진적으로 붙일 수 있습니다.
 // 초보자 안내: 이미지처럼 큰 데이터를 브라우저 저장소에 따로 저장하고 꺼내는 도우미 파일입니다.
 
 const DB_NAME = 'papermate-image-store';

@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [
     react({
       babel: {
+        // TypeScript 변경 표시: Vite의 React 빌드 과정에 React Compiler를 연결합니다.
         plugins: ['babel-plugin-react-compiler'],
       },
     }),
