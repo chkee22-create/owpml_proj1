@@ -1,3 +1,5 @@
+# 초보자 안내: 분석 내용을 행과 열이 있는 표 데이터로 바꾸는 파일입니다.
+
 from .common import base_asset, meaningful_lines
 
 

@@ -1,3 +1,5 @@
+// 초보자 안내: 프론트엔드 React 앱을 index.html의 root 영역에 붙이는 시작 파일입니다.
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App'; // App.js를 불러옵니다.

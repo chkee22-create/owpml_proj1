@@ -1,3 +1,5 @@
+# 초보자 안내: PDF, DOCX, HWPX, 이미지 등에서 텍스트를 뽑고 기본 분석 결과를 만드는 서비스입니다.
+
 import io
 import re
 import struct

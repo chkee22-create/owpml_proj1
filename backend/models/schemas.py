@@ -1,3 +1,5 @@
+# 초보자 안내: 프론트엔드와 백엔드가 주고받는 데이터 모양을 Pydantic 모델로 정의한 파일입니다.
+
 from typing import Any
 
 from pydantic import BaseModel, Field

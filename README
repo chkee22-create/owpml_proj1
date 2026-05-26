@@ -1,46 +1,52 @@
-프로젝트 설명 : AI 기반 OWPML 논문 분석 및 시각화 챗봇
+PaperMate
+=========
 
-버전 정보 : python v - 3.11.x 
-node.js 20.x.x
-react 18.x.x
+PaperMate는 PDF, HWPX, DOCX, 이미지, TXT 문서를 업로드해 핵심 내용을 분석하고 프로젝트로 관리하는 웹 앱입니다.
 
-# 🎓 AI 기반 논문 분석 챗봇 서비스
-이 프로젝트는 대학생들을 위한 논문 Q&A 및 데이터 시각화 서비스입니다.
+폴더 구조
+---------
 
-### 🛠 기술 스택 (Tech Stack)
-- **Frontend**: React
-- **Backend**: Python (FastAPI)
-- **AI**: NLP (OWPML Parsing, RAG)
-- **Cloud**: AWS
+- `frontend/`: React 화면 코드입니다.
+- `backend/`: FastAPI API 서버 코드입니다.
+- `backend/app/routers/`: 주소별 API 함수가 모여 있습니다.
+- `backend/app/services/`: 문서 분석, AI 호출, 시각화 생성 로직이 모여 있습니다.
 
-### 📂 폴더 구조
-- `ai/`: 논문 파싱 및 RAG 모델 로직
-- `backend/`: API 서버 및 데이터 처리
-- `frontend/`: UI/UX 및 사용자 화면
+CMD에서 실행하기
+---------------
 
-### 🚀 실행 방법
-1. 저장소 클론: `git clone [주소]`
-2. 각 폴더의 README를 참고하여 환경 세팅 진행
+프론트엔드:
 
-프로젝트 깃허브에 코드 올리는 순서
+```bat
+cd frontend
+npm install
+npm start
+```
 
-# 1. 현재 어떤 파일들이 수정되었거나 새로 추가되었는지 확인
-git status
+백엔드:
 
-# 2. 변경된 모든 파일들을 업로드 장바구니(Staging Area)에 담기
-git add .
+```bat
+cd backend
+python -m venv .venv
+.venv\Scripts\activate.bat
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
-# 3. 이번 업로드의 제목(설명)을 달아 기록하기
-# (예: 프론트 구조 개편 및 AI 폴더 정리)
-git commit -m "feat: 프로젝트 폴더 구조 개편 및 모듈화 적용"
+브라우저에서 프론트엔드 주소는 보통 `http://localhost:3000`입니다.
 
-# 4. 깃허브(원격)에 최종 업로드하기 (보통 기본 브랜치명이 main 또는 master입니다)
-git push origin main
+환경변수
+-------
 
-만약 오류가 생겼을 시
+- `MONGO_URL`: MongoDB 주소입니다. 기본값은 `mongodb://localhost:27017`입니다.
+- `MONGO_DB_NAME`: 사용할 MongoDB 데이터베이스 이름입니다. 기본값은 `papermate`입니다.
+- `JWT_SECRET_KEY`: 로그인 토큰 서명에 쓰는 비밀키입니다. 배포할 때는 반드시 바꿔야 합니다.
+- `OPENAI_API_KEY`: OpenAI 분석을 쓸 때 필요한 API 키입니다.
+- `GOOGLE_API_KEY` 또는 `GEMINI_API_KEY`: Gemini 분석을 쓸 때 필요한 API 키입니다.
 
-# 1. 내 깃허브 이메일 등록하기
-git config --global user.email "유저님의_깃허브_이메일@example.com"
+검증 명령
+---------
 
-# 2. 내 깃허브 이름(닉네임) 등록하기
-git config --global user.name "유저님의_깃허브_이름"
+```bat
+cd frontend
+npm run build
+```

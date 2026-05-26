@@ -1,3 +1,5 @@
+// 초보자 안내: 사용자가 실제로 보게 되는 한 화면 단위의 React 페이지 컴포넌트입니다.
+
 import React from 'react';
 import {
   ChartPlaceholder,

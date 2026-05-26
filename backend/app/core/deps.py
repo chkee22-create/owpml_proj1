@@ -1,3 +1,5 @@
+# 초보자 안내: FastAPI 라우터에서 현재 로그인한 사용자를 확인할 때 쓰는 공통 의존성 파일입니다.
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 

@@ -1,3 +1,5 @@
+# 초보자 안내: 시각화 생성 서비스들이 함께 쓰는 공통 텍스트 정리/추출 도우미 함수 모음입니다.
+
 import re
 from collections import Counter
 from datetime import datetime, timezone

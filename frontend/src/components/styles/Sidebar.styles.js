@@ -1,3 +1,5 @@
+// 초보자 안내: styled-components로 화면의 색상, 간격, 배치 같은 스타일을 정의하는 파일입니다.
+
 import styled from 'styled-components';
 
 export const SidebarContainer = styled.aside`

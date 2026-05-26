@@ -1,3 +1,5 @@
+# 초보자 안내: 프로젝트 목록 저장, 동기화, 삭제, 초대코드 조회 API를 담당합니다.
+
 from datetime import datetime, timezone
 from typing import Any
 

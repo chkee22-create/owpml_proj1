@@ -1,3 +1,5 @@
+# 초보자 안내: 이전 구조에서 사용하던 문서 분석 서비스 파일입니다. app/services 버전과 역할이 같습니다.
+
 import io
 import re
 import struct

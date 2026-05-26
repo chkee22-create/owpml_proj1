@@ -1,3 +1,5 @@
+# 초보자 안내: 문서 파일 업로드와 분석 요청을 처리하는 API 라우터입니다.
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ..services.document_analysis import build_analysis_answer, extract_file_text

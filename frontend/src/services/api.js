@@ -1,3 +1,5 @@
+// 초보자 안내: 프론트엔드에서 백엔드 API를 호출할 때 공통으로 사용하는 axios 설정 파일입니다.
+
 import axios from 'axios';
 
 const getApiBaseUrl = () => {

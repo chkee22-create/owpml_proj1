@@ -1,3 +1,5 @@
+# 초보자 안내: 회원가입, 로그인, 프로필 수정, 비밀번호 변경 같은 인증 API를 모아둔 파일입니다.
+
 from datetime import datetime, timezone
 
 from bson import ObjectId

@@ -1,3 +1,5 @@
+// 초보자 안내: 로그인 상태와 사용자 정보를 여러 컴포넌트에서 같이 쓰게 해주는 React Context입니다.
+
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { authAPI } from '../services/api';
 import {

@@ -1,3 +1,5 @@
+// 초보자 안내: Tailwind CSS가 어떤 파일에서 클래스 이름을 찾을지 알려주는 설정 파일입니다.
+
 const toScale = (values) => ({
   50: values[0],
   100: values[1],

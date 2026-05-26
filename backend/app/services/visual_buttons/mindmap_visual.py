@@ -1,3 +1,5 @@
+# 초보자 안내: 분석 내용을 중심 주제와 가지 구조의 마인드맵 데이터로 바꾸는 파일입니다.
+
 from .common import base_asset, meaningful_lines
 
 

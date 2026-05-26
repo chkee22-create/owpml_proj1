@@ -1,3 +1,5 @@
+// 초보자 안내: 앱 전체에서 함께 쓰는 색상 팔레트를 모아둔 파일입니다.
+
 // src/shared/palette.js
 
 export const palette = {

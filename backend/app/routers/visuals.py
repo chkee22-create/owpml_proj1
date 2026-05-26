@@ -1,3 +1,5 @@
+# 초보자 안내: 분석 결과를 표, 그래프, 마인드맵, 이미지 설명 형태로 바꾸는 API 라우터입니다.
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.services.document_analysis import build_analysis_answer, extract_file_text

@@ -1,3 +1,5 @@
+# 초보자 안내: 분석 문장 속 숫자와 항목을 찾아 그래프용 데이터로 바꾸는 파일입니다.
+
 from .common import base_asset, frequent_keywords
 
 

@@ -1,3 +1,5 @@
+# 초보자 안내: 비밀번호 암호화와 로그인 토큰(JWT) 생성/검증을 담당하는 보안 파일입니다.
+
 import os
 from datetime import datetime, timedelta, timezone
 import bcrypt
