@@ -67,32 +67,7 @@ const getViewFromLocation = () => {
   return ROUTE_TO_VIEW[route] || VIEW.MAIN;
 };
 
-const getAuthErrorMessage = (error, mode) => {
-  if (!error?.response) {
-    return '백엔드 서버와 연결할 수 없습니다. FastAPI 서버가 켜져 있는지 확인해주세요.';
-  }
-
-  const status = error.response.status;
-  const detail = error.response.data?.detail;
-
-  if (mode === 'login') {
-    if (status === 404) return '등록되지 않은 아이디입니다. 아이디를 확인하거나 회원가입을 진행해주세요.';
-    if (status === 401) return '비밀번호가 올바르지 않습니다. 다시 입력해주세요.';
-  }
-
-  if (mode === 'signup') {
-    if (status === 409) return '이미 사용 중인 아이디입니다. 다른 아이디를 입력해주세요.';
-    if (status === 422) return '아이디는 3자 이상, 비밀번호는 4자 이상으로 입력해주세요.';
-  }
-
-  if (status === 0 || status >= 500) {
-    return '서버 처리 중 문제가 발생했습니다. 백엔드 터미널 로그를 확인해주세요.';
-  }
-
-  return detail || error.message || '요청을 처리하지 못했습니다.';
-};
-
-const syncBrowserHistory = (view, replace = false) => {
+const syncBrowserHistory = (view: string, replace = false) => {
   const url = new URL(window.location.href);
   const route = VIEW_TO_ROUTE[view] || VIEW_TO_ROUTE[VIEW.MAIN];
 
@@ -114,8 +89,8 @@ function Home() {
 
   const { isLoggedIn, user, logout, login, signup, loading } = useAuth();
   const [viewMode, setViewMode] = useState(getViewFromLocation);
-  const [restoredData, setRestoredData] = useState(null);
-  const [shareOpenData, setShareOpenData] = useState(null);
+  const [restoredData, setRestoredData] = useState<any>(null);
+  const [shareOpenData, setShareOpenData] = useState<any>(null);
   const [recentConversations, setRecentConversations] = useState(
     loadRecentConversations,
   );
@@ -123,12 +98,12 @@ function Home() {
   const [formData, setFormData] = useState({ id: "", pw: "", confirmPw: "" });
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-  const [modalMode, setModalMode] = useState(null);
+  const [modalMode, setModalMode] = useState<string | null>(null);
   const [analysisSessionKey, setAnalysisSessionKey] = useState(
     () => `analysis-${Date.now()}`,
   );
 
-  const navigateToView = (nextView, options: NavigateOptions = {}) => {
+  const navigateToView = (nextView: string, options: NavigateOptions = {}) => {
     const {
       replace = false,
       clearRestoredData = false,
@@ -144,7 +119,7 @@ function Home() {
   useEffect(() => {
     syncBrowserHistory(viewMode, true);
 
-    const handlePopState = (event) => {
+    const handlePopState = (event: PopStateEvent) => {
       const nextView = event.state?.papermateView || getViewFromLocation();
       setViewMode(nextView);
       if (nextView === VIEW.MAIN) {
@@ -159,7 +134,7 @@ function Home() {
   }, []);
 
   useEffect(() => {
-    const syncRecents = (event) => {
+    const syncRecents = (event: any) => {
       if (event.detail?.key && event.detail.key !== getRecentConversationsKey())
         return;
       setRecentConversations(loadRecentConversations());
@@ -181,13 +156,13 @@ function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.username]);
 
-  const handleInputChange = (event) => {
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setAuthError("");
   };
 
-  const handleMenuRouting = (menuName) => {
+  const handleMenuRouting = (menuName: string) => {
     const protectedMenus = [
       VIEW.SHARE,
       VIEW.ANALYSIS,
@@ -225,7 +200,7 @@ function Home() {
     setModalMode("signup");
   };
 
-  const submitAuthRequest = async (mode) => {
+  const submitAuthRequest = async (mode: string) => {
     const usernameInput = formData.id.trim();
     const passwordInput = formData.pw;
 
@@ -252,8 +227,12 @@ function Home() {
       }
       setModalMode(null);
       setFormData({ id: "", pw: "", confirmPw: "" });
-    } catch (error) {
-      setAuthError(getAuthErrorMessage(error, mode));
+    } catch (error: any) {
+      setAuthError(
+        error.response?.data?.detail ||
+          error.message ||
+          "서버와 연결할 수 없습니다.",
+      );
     } finally {
       setAuthLoading(false);
     }
@@ -268,7 +247,7 @@ function Home() {
     });
   };
 
-  const handleTimelineRestoreJump = (historyData) => {
+  const handleTimelineRestoreJump = (historyData: any) => {
     if (!isLoggedIn) {
       setModalMode("recommend");
       return;
@@ -277,7 +256,7 @@ function Home() {
     navigateToView(VIEW.ANALYSIS);
   };
 
-  const handleProjectRestoreJump = (projectData) => {
+  const handleProjectRestoreJump = (projectData: any) => {
     if (!isLoggedIn) {
       setModalMode("recommend");
       return;
@@ -286,7 +265,7 @@ function Home() {
     navigateToView(VIEW.ANALYSIS);
   };
 
-  const handleSharedProjectOpen = (projectData) => {
+  const handleSharedProjectOpen = (projectData: any) => {
     if (!isLoggedIn) {
       setModalMode("recommend");
       return;
@@ -295,7 +274,7 @@ function Home() {
     navigateToView(VIEW.SHARE);
   };
 
-  const handleRecentConversationClick = (conversation) => {
+  const handleRecentConversationClick = (conversation: any) => {
     const projects = readJson(getProjectsKey(), []);
     const project = Array.isArray(projects)
       ? projects.find(
@@ -338,11 +317,11 @@ function Home() {
     navigateToView(VIEW.ANALYSIS);
   };
 
-  const handleDeleteRecent = (id, event) => {
+  const handleDeleteRecent = (id: string, event: React.MouseEvent) => {
     event?.stopPropagation();
     if (!window.confirm("이 최근 대화 기록을 삭제하시겠습니까?")) return;
 
-    const updatedRecents = recentConversations.filter((item) => item.id !== id);
+    const updatedRecents = recentConversations.filter((item: any) => item.id !== id);
     setRecentConversations(updatedRecents);
     writeJson(getRecentConversationsKey(), updatedRecents);
 
@@ -350,23 +329,26 @@ function Home() {
       restoredData?.conversationId ||
       restoredData?.projectId ||
       restoredData?.id;
+      
+    // 💡 [오류 수정] 활성화된 채팅 삭제 시 VIEW.MAIN으로 정상 튕겨나가도록 수정
     if (activeId === id) {
       setRestoredData(null);
       setAnalysisSessionKey(`analysis-${Date.now()}`);
-      if (viewMode === VIEW.ANALYSIS)
-        navigateToView(VIEW.ANALYSIS, { clearRestoredData: true });
+      if (viewMode === VIEW.ANALYSIS) {
+        navigateToView(VIEW.MAIN, { replace: true, clearRestoredData: true });
+      }
     }
   };
 
-  const handleConversationChange = (conversationId) => {
+  const handleConversationChange = (conversationId: string) => {
     const updatedRecents = loadRecentConversations();
     setRecentConversations(updatedRecents);
     const nextConversation = updatedRecents.find(
-      (item) =>
+      (item: any) =>
         item.id === conversationId || item.conversationId === conversationId,
     );
     if (nextConversation) {
-      setRestoredData((prev) => ({
+      setRestoredData((prev: any) => ({
         ...(prev || {}),
         id: conversationId,
         conversationId,
@@ -385,6 +367,7 @@ function Home() {
     VIEW.PROJECTS,
     VIEW.MYPAGE,
   ].includes(viewMode);
+  
   const activeConversationId =
     viewMode === VIEW.ANALYSIS
       ? restoredData?.conversationId ||
