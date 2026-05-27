@@ -85,8 +85,8 @@ def _mount_frontend(api: FastAPI, build_dir: Path) -> None:
     if assets_dir.exists():
         api.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-    @api.get("/{full_path:path}", include_in_schema=False)
-    async def serve_react_app(full_path: str) -> FileResponse | dict[str, str]:
+    @api.get("/{full_path:path}", include_in_schema=False, response_model=None)
+    async def serve_react_app(full_path: str):
         # React Router 주소로 새로고침해도 index.html을 돌려줘야 SPA가 살아납니다.
         if full_path in RESERVED_FRONTEND_PATHS:
             return {"message": "API documentation is disabled."}
