@@ -4,6 +4,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ..services.document_analysis import build_analysis_answer, extract_file_text
 from ..services.llm_analysis import analyze_with_llm
+from models.schemas import AnalysisResponse
 
 
 # /api/analysis 아래의 분석 API를 모아두는 FastAPI Router입니다.
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 # 요청 형식은 multipart/form-data입니다.
 # - question: 사용자가 채팅창에 입력한 질문
 # - files: 업로드한 PDF/HWPX/HWP/DOCX/이미지/TXT 파일 목록
-@router.post("/chat")
+@router.post("/chat", response_model=AnalysisResponse)
 async def analyze_chat(
     question: str = Form(""),
     llm_provider: str = Form("openai"),
@@ -33,7 +34,11 @@ async def analyze_chat(
 
         # 파일 확장자에 따라 PDF/HWPX/DOCX/이미지/TXT 추출기가 선택됩니다.
         # 결과 text는 이후 기본 분석과 LLM 분석의 공통 입력이 됩니다.
-        text, file_format = extract_file_text(upload.filename or "unknown", content)
+        try:
+            text, file_format = extract_file_text(upload.filename or "unknown", content)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"{upload.filename or '파일'} 분석 중 오류가 발생했습니다: {exc}") from exc
+
         extracted_docs.append(
             {
                 "filename": upload.filename or "unknown",
@@ -55,11 +60,13 @@ async def analyze_chat(
         openai_api_key=openai_api_key.strip() or None,
         google_api_key=google_api_key.strip() or None,
     )
-    if not llm_answer:
+    if not llm_answer.get("llm_used"):
         return {
             **fallback_answer,
             "llm_used": False,
-            "model": None,
+            "provider": llm_answer.get("provider"),
+            "model": llm_answer.get("model"),
+            "llm_error": llm_answer.get("llm_error"),
         }
 
     # LLM 답변이 성공하면 fallback의 documents/keywords 같은 구조 정보와

@@ -164,6 +164,61 @@
 4. 백엔드는 `projects` 컬렉션에서 `user_id + project.id` 기준으로 upsert합니다.
 5. 공유 페이지에서 초대코드를 입력하면 `/api/projects/invite/{invite_code}`로 프로젝트를 조회합니다.
 
+## API Response Schemas
+
+DB 저장 구조와 별개로, 프론트가 API에서 기대하는 대표 응답은 아래처럼 고정했습니다.
+
+### `POST /api/analysis/chat`
+
+```json
+{
+  "answer": "기본 문서 추출 또는 LLM 분석 답변",
+  "documents": [],
+  "keywords": [],
+  "metrics": [],
+  "intent": "summary",
+  "llm_used": false,
+  "provider": "openai",
+  "model": null,
+  "llm_error": "OpenAI API 키가 없어 기본 문서 추출로 응답했습니다."
+}
+```
+
+`llm_used`가 `false`여도 `answer`는 항상 기본 문서 추출 결과로 채워지는 것을 목표로 합니다.  
+LLM 키가 없거나 호출에 실패하면 `llm_error`에 이유를 담습니다.
+
+### `POST /api/visuals/{type}`
+
+```json
+{
+  "visual": {
+    "id": "visual-table-1710000000000",
+    "kind": "table",
+    "title": "실험 결과 비교표",
+    "desc": "시각화 설명",
+    "rows": []
+  }
+}
+```
+
+`type`은 현재 `table`, `graph`, `image`, `mindmap`을 사용합니다.
+
+### `GET /api/projects`
+
+```json
+{
+  "projects": []
+}
+```
+
+### `POST /api/projects`
+
+```json
+{
+  "project": {}
+}
+```
+
 ## 앞으로 고정하면 좋은 부분
 
 아직은 `project` 내부가 자유로운 JSON이지만, 배포 전에는 아래를 별도 모델로 나누면 더 안정적입니다.

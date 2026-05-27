@@ -60,3 +60,58 @@ class ProjectListPayload(BaseModel):
     """브라우저에 있는 프로젝트 배열을 백엔드와 동기화할 때 쓰는 요청 body입니다."""
 
     projects: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ProjectResponse(BaseModel):
+    """프로젝트 하나를 저장하거나 초대코드로 조회했을 때의 응답입니다."""
+
+    project: dict[str, Any]
+
+
+class ProjectListResponse(BaseModel):
+    """프로젝트 목록 조회/동기화 응답입니다."""
+
+    projects: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class HealthResponse(BaseModel):
+    """서버와 MongoDB 상태 확인 응답입니다."""
+
+    status: str
+    database: str
+    connected: bool
+    error: str | None = None
+
+
+class AnalysisDocument(BaseModel):
+    """업로드 파일에서 추출한 분석용 문서 메타데이터입니다."""
+
+    filename: str
+    format: str
+    chars: int = 0
+
+
+class AnalysisResponse(BaseModel):
+    """분석 Q&A API가 프론트에 내려주는 표준 응답입니다."""
+
+    answer: str
+    documents: list[dict[str, Any]] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    metrics: list[str] = Field(default_factory=list)
+    intent: str | None = None
+    llm_used: bool = False
+    provider: str | None = None
+    model: str | None = None
+    llm_error: str | None = None
+
+
+class VisualResponse(BaseModel):
+    """표/그래프/이미지/마인드맵 생성 API 응답입니다."""
+
+    visual: dict[str, Any]
+
+
+class MessageResponse(BaseModel):
+    """단순 성공 메시지 응답입니다."""
+
+    message: str

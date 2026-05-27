@@ -55,11 +55,21 @@ def _build_prompts(question: str, extracted_docs: list[dict]) -> tuple[str, str]
     return system_prompt, user_prompt
 
 
-def _analyze_with_openai(question: str, extracted_docs: list[dict], api_key: str) -> dict | None:
+def _llm_error(message: str, provider: str, model: str | None = None) -> dict:
+    return {
+        "answer": "",
+        "llm_used": False,
+        "provider": provider,
+        "model": model,
+        "llm_error": message,
+    }
+
+
+def _analyze_with_openai(question: str, extracted_docs: list[dict], api_key: str) -> dict:
     try:
         from openai import OpenAI
     except ModuleNotFoundError:
-        return None
+        return _llm_error("openai 패키지가 설치되어 있지 않습니다.", "openai")
 
     model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
     client = OpenAI(api_key=api_key)
@@ -75,11 +85,11 @@ def _analyze_with_openai(question: str, extracted_docs: list[dict], api_key: str
             temperature=0.2,
         )
         answer = response.output_text.strip()
-    except Exception:
-        return None
+    except Exception as exc:
+        return _llm_error(f"OpenAI 호출 실패: {exc}", "openai", model)
 
     if not answer:
-        return None
+        return _llm_error("OpenAI가 빈 답변을 반환했습니다.", "openai", model)
 
     return {
         "answer": answer,
@@ -89,11 +99,11 @@ def _analyze_with_openai(question: str, extracted_docs: list[dict], api_key: str
     }
 
 
-def _analyze_with_google(question: str, extracted_docs: list[dict], api_key: str) -> dict | None:
+def _analyze_with_google(question: str, extracted_docs: list[dict], api_key: str) -> dict:
     try:
         from google import genai
     except ModuleNotFoundError:
-        return None
+        return _llm_error("google-genai 패키지가 설치되어 있지 않습니다.", "google")
 
     model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
     system_prompt, user_prompt = _build_prompts(question, extracted_docs)
@@ -103,11 +113,11 @@ def _analyze_with_google(question: str, extracted_docs: list[dict], api_key: str
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(model=model, contents=prompt)
         answer = (getattr(response, "text", "") or "").strip()
-    except Exception:
-        return None
+    except Exception as exc:
+        return _llm_error(f"Gemini 호출 실패: {exc}", "google", model)
 
     if not answer:
-        return None
+        return _llm_error("Gemini가 빈 답변을 반환했습니다.", "google", model)
 
     return {
         "answer": answer,
@@ -123,16 +133,16 @@ def analyze_with_llm(
     provider: str = "openai",
     openai_api_key: str | None = None,
     google_api_key: str | None = None,
-) -> dict | None:
+) -> dict:
     normalized_provider = (provider or "openai").lower()
 
     if normalized_provider == "google":
         api_key = google_api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         if not api_key:
-            return None
+            return _llm_error("Google/Gemini API 키가 없어 기본 문서 추출로 응답했습니다.", "google")
         return _analyze_with_google(question, extracted_docs, api_key)
 
     api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
     if not api_key:
-        return None
+        return _llm_error("OpenAI API 키가 없어 기본 문서 추출로 응답했습니다.", "openai")
     return _analyze_with_openai(question, extracted_docs, api_key)

@@ -4,12 +4,13 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.services.document_analysis import build_analysis_answer, extract_file_text
 from app.services.visual_buttons import VISUAL_CREATORS
+from models.schemas import VisualResponse
 
 
 router = APIRouter(prefix="/api/visuals", tags=["visuals"])
 
 
-@router.post("/{visual_type}")
+@router.post("/{visual_type}", response_model=VisualResponse)
 async def create_visual(
     visual_type: str,
     analysis_text: str = Form(""),
@@ -23,7 +24,11 @@ async def create_visual(
     extracted_docs = []
     for upload in files:
         content = await upload.read()
-        text, file_format = extract_file_text(upload.filename or "unknown", content)
+        try:
+            text, file_format = extract_file_text(upload.filename or "unknown", content)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"{upload.filename or '파일'} 분석 중 오류가 발생했습니다: {exc}") from exc
+
         extracted_docs.append(
             {
                 "filename": upload.filename or "unknown",
