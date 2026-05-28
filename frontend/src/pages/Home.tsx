@@ -114,8 +114,8 @@ function Home() {
 
   const { isLoggedIn, user, logout, login, signup, loading } = useAuth();
   const [viewMode, setViewMode] = useState(getViewFromLocation);
-  const [restoredData, setRestoredData] = useState(null);
-  const [shareOpenData, setShareOpenData] = useState(null);
+  const [restoredData, setRestoredData] = useState<any>(null);
+  const [shareOpenData, setShareOpenData] = useState<any>(null);
   const [recentConversations, setRecentConversations] = useState(
     loadRecentConversations,
   );
@@ -123,12 +123,12 @@ function Home() {
   const [formData, setFormData] = useState({ id: "", pw: "", confirmPw: "" });
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
-  const [modalMode, setModalMode] = useState(null);
+  const [modalMode, setModalMode] = useState<string | null>(null);
   const [analysisSessionKey, setAnalysisSessionKey] = useState(
     () => `analysis-${Date.now()}`,
   );
 
-  const navigateToView = (nextView, options: NavigateOptions = {}) => {
+  const navigateToView = (nextView: string, options: NavigateOptions = {}) => {
     const {
       replace = false,
       clearRestoredData = false,
@@ -144,7 +144,7 @@ function Home() {
   useEffect(() => {
     syncBrowserHistory(viewMode, true);
 
-    const handlePopState = (event) => {
+    const handlePopState = (event: PopStateEvent) => {
       const nextView = event.state?.papermateView || getViewFromLocation();
       setViewMode(nextView);
       if (nextView === VIEW.MAIN) {
@@ -159,7 +159,7 @@ function Home() {
   }, []);
 
   useEffect(() => {
-    const syncRecents = (event) => {
+    const syncRecents = (event: any) => {
       if (event.detail?.key && event.detail.key !== getRecentConversationsKey())
         return;
       setRecentConversations(loadRecentConversations());
@@ -181,13 +181,13 @@ function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.username]);
 
-  const handleInputChange = (event) => {
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setAuthError("");
   };
 
-  const handleMenuRouting = (menuName) => {
+  const handleMenuRouting = (menuName: string) => {
     const protectedMenus = [
       VIEW.SHARE,
       VIEW.ANALYSIS,
@@ -225,7 +225,7 @@ function Home() {
     setModalMode("signup");
   };
 
-  const submitAuthRequest = async (mode) => {
+  const submitAuthRequest = async (mode: string) => {
     const usernameInput = formData.id.trim();
     const passwordInput = formData.pw;
 
@@ -268,7 +268,7 @@ function Home() {
     });
   };
 
-  const handleTimelineRestoreJump = (historyData) => {
+  const handleTimelineRestoreJump = (historyData: any) => {
     if (!isLoggedIn) {
       setModalMode("recommend");
       return;
@@ -277,7 +277,7 @@ function Home() {
     navigateToView(VIEW.ANALYSIS);
   };
 
-  const handleProjectRestoreJump = (projectData) => {
+  const handleProjectRestoreJump = (projectData: any) => {
     if (!isLoggedIn) {
       setModalMode("recommend");
       return;
@@ -286,7 +286,7 @@ function Home() {
     navigateToView(VIEW.ANALYSIS);
   };
 
-  const handleSharedProjectOpen = (projectData) => {
+  const handleSharedProjectOpen = (projectData: any) => {
     if (!isLoggedIn) {
       setModalMode("recommend");
       return;
@@ -295,7 +295,7 @@ function Home() {
     navigateToView(VIEW.SHARE);
   };
 
-  const handleRecentConversationClick = (conversation) => {
+  const handleRecentConversationClick = (conversation: any) => {
     const projects = readJson(getProjectsKey(), []);
     const project = Array.isArray(projects)
       ? projects.find(
@@ -315,7 +315,7 @@ function Home() {
       .reverse()
       .find((item) => item.role === "ai" || item.role === "asset");
 
-    if (!conversation.question && !project) {
+    if (!conversation.question && !project && thread.length === 0) {
       navigateToView(VIEW.ANALYSIS);
       return;
     }
@@ -338,11 +338,11 @@ function Home() {
     navigateToView(VIEW.ANALYSIS);
   };
 
-  const handleDeleteRecent = (id, event) => {
+  const handleDeleteRecent = (id: string, event: React.MouseEvent) => {
     event?.stopPropagation();
     if (!window.confirm("이 최근 대화 기록을 삭제하시겠습니까?")) return;
 
-    const updatedRecents = recentConversations.filter((item) => item.id !== id);
+    const updatedRecents = recentConversations.filter((item: any) => item.id !== id);
     setRecentConversations(updatedRecents);
     writeJson(getRecentConversationsKey(), updatedRecents);
 
@@ -350,23 +350,26 @@ function Home() {
       restoredData?.conversationId ||
       restoredData?.projectId ||
       restoredData?.id;
+      
+    // 💡 [오류 수정] 활성화된 채팅 삭제 시 VIEW.MAIN으로 정상 튕겨나가도록 수정
     if (activeId === id) {
       setRestoredData(null);
       setAnalysisSessionKey(`analysis-${Date.now()}`);
-      if (viewMode === VIEW.ANALYSIS)
-        navigateToView(VIEW.ANALYSIS, { clearRestoredData: true });
+      if (viewMode === VIEW.ANALYSIS) {
+        navigateToView(VIEW.MAIN, { replace: true, clearRestoredData: true });
+      }
     }
   };
 
-  const handleConversationChange = (conversationId) => {
+  const handleConversationChange = (conversationId: string) => {
     const updatedRecents = loadRecentConversations();
     setRecentConversations(updatedRecents);
     const nextConversation = updatedRecents.find(
-      (item) =>
+      (item: any) =>
         item.id === conversationId || item.conversationId === conversationId,
     );
     if (nextConversation) {
-      setRestoredData((prev) => ({
+      setRestoredData((prev: any) => ({
         ...(prev || {}),
         id: conversationId,
         conversationId,
@@ -385,6 +388,7 @@ function Home() {
     VIEW.PROJECTS,
     VIEW.MYPAGE,
   ].includes(viewMode);
+  
   const activeConversationId =
     viewMode === VIEW.ANALYSIS
       ? restoredData?.conversationId ||
