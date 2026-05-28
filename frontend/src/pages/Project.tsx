@@ -18,6 +18,7 @@ import {
   DrawerBackdrop,
   DrawerContainer
 } from './styles/Project.styles';
+import { DynamicVisualizer } from '../components/DynamicVisualizer';
 import {
   getProjectsKey,
   getRecentConversationsKey,
@@ -54,107 +55,7 @@ const makeVisualRows = (fileNames, lines) => {
 };
 
 const renderDetailedVisualPreview = (asset: any) => {
-  if (asset.kind === 'table') {
-    let rows = asset.rows || [];
-    
-    // 혹시 AI가 문자열 형태로 보냈을 경우를 대비한 방어 코드
-    if (typeof rows === 'string') {
-      try { rows = JSON.parse(rows); } catch (e) { rows = []; }
-    }
-
-    // 표시할 기본 더미 데이터 생성 (AI 데이터가 없을 경우)
-    if (!Array.isArray(rows) || rows.length === 0) {
-      rows = makeVisualRows(['업로드 문서'], splitMeaningfulLines(asset.text || asset.desc));
-    }
-
-    // 💡 핵심: AI가 생성한 모든 객체의 키(Key)를 수집하여 중복 제거 (컬럼명 추출)
-    const allKeys = Array.from(new Set(rows.flatMap(Object.keys)));
-
-    return (
-      // 컬럼 개수(allKeys.length)에 맞춰 CSS Grid를 동적으로 생성합니다!
-      <div className="mini-table" style={{ gridTemplateColumns: `repeat(${allKeys.length}, 1fr)` }}>
-        
-        {/* 1. 테이블 헤더 (컬럼 이름 렌더링) */}
-        {allKeys.map((key: any) => (
-          <div className="th" key={`th-${key}`}>
-            {key}
-          </div>
-        ))}
-        
-        {/* 2. 테이블 본문 데이터 렌더링 */}
-        {rows.flatMap((row: any, rIndex: number) =>
-          allKeys.map((key: any) => (
-            <div key={`td-${rIndex}-${key}`}>
-              {row[key] !== undefined && row[key] !== null ? String(row[key]) : '-'}
-            </div>
-          ))
-        )}
-      </div>
-    );
-  }
-
-  // 💡 2. 그래프(Graph) 로직 (그래프는 수치가 필요하므로 최대한 score를 찾거나 임의 생성)
-  if (asset.kind === 'graph') {
-    const rows = asset.rows?.length ? asset.rows : [{ label: '핵심', score: 70 }, { label: '비교', score: 62 }];
-    const points = rows.slice(0, 5).map((row: any, index: number) => {
-      const x = 12 + index * (76 / Math.max(1, Math.min(rows.length, 5) - 1));
-      const numericScore = typeof row.score === 'number' ? row.score : (parseFloat(row.score) || 50);
-      const y = 92 - Math.max(12, Math.min(numericScore, 96)) * 0.78;
-      return `${x},${y}`;
-    });
-    return (
-      <div className="mini-graph">
-        <svg className="graph-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <polyline points={points.join(' ')} />
-          {points.map((point: string) => {
-            const [cx, cy] = point.split(',');
-            return <circle key={point} cx={cx} cy={cy} r="2.2" />;
-          })}
-        </svg>
-        <div className="axis y-axis">수치</div>
-        <div className="axis x-axis">자료</div>
-        {rows.slice(0, 5).map((row: any, i: number) => {
-          const label = row.label || row.title || row.name || `항목 ${i+1}`;
-          const numericScore = typeof row.score === 'number' ? row.score : (parseFloat(row.score) || 50);
-          return (
-            <div className="bar-wrap" key={`bar-${label}-${i}`}>
-              <div className="bar" style={{ height: `${Math.max(28, Math.min(numericScore, 96))}%` }} />
-              <strong>{numericScore}</strong>
-              <span>{label}</span>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  // 💡 3. 마인드맵 로직
-  if (asset.kind === 'mindmap') {
-    const branches = asset.branches?.length
-      ? asset.branches
-      : splitMeaningfulLines(asset.text || asset.desc).slice(0, 4);
-    return (
-      <div className="mini-mindmap">
-        <div className="center-node">{asset.title}</div>
-        <div className="tree-trunk" aria-hidden="true"></div>
-        <div className="branches">
-          {branches.slice(0, 5).map((branch: string, index: number) => (
-            <span className={`branch branch-${index + 1}`} key={`${branch}-${index}`}>{branch}</span>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // 💡 4. 이미지(기본) 로직
-  return (
-    <div className="mini-image">
-      <div className="image-title">{asset.desc || asset.title}</div>
-      <div className="chips">
-        {(asset.keywords || []).slice(0, 6).map((keyword: string) => <span key={keyword}>{keyword}</span>)}
-      </div>
-    </div>
-  );
+  return <DynamicVisualizer config={asset} fallbackTitle={asset.title} />;
 };
 
 const legacyDummyProjectTitles = [

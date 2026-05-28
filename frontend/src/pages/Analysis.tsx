@@ -23,6 +23,7 @@ import {
   VisualPanel,
   PreviewModalContainer,
 } from './styles/AnalysisLocal.styles';
+import { DynamicVisualizer } from '../components/DynamicVisualizer';
 import { analysisAPI, projectAPI } from '../services/api';
 import {
   getProjectsKey,
@@ -36,8 +37,8 @@ const MAX_PROJECTS = 10;
 const MAX_VISUALS = 10;
 const MAX_RECENT_CONVERSATIONS = 50;
 
-const visualStorageKinds = new Set(['table', 'graph', 'image', 'mindmap']);
-const isVisualStorageItem = (visual) => visualStorageKinds.has(visual?.kind || 'chart');
+const visualStorageKinds = new Set(['table', 'graph', 'image', 'mindmap', 'chart']);
+const isVisualStorageItem = (visual) => visualStorageKinds.has(visual?.kind) || visualStorageKinds.has(visual?.type);
 
 const createInviteCode = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -66,6 +67,13 @@ const toStoredThread = (messages) =>
       text: message.text || message.title || '',
       rows: message.rows,
       kind: message.kind,
+      type: message.type,
+      chartType: message.chartType,
+      xAxisKey: message.xAxisKey,
+      columns: message.columns,
+      series: message.series,
+      data: message.data,
+      theme: message.theme,
     }));
 
 const splitMeaningfulLines = (text) =>
@@ -202,6 +210,11 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
     setFiles(restoredFiles);
     if (restoredThread.length > 0) setMessages(restoredThread);
     setCurrentProject(restoredData);
+    
+    // 이전에 임시 생성되었던 시각화 자료들을 대화 기록에서 추출하여 좌측 '생성된 자료' 패널에 복구
+    const restoredGeneratedVisuals = restoredThread.filter((msg: any) => msg.role === 'asset' && isVisualStorageItem(msg));
+    setGeneratedVisuals(restoredGeneratedVisuals);
+    
     setVisuals((restoredData.visuals || []).filter(isVisualStorageItem));
   }, [restoredData]);
 
@@ -273,11 +286,17 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
     handleSendMessage(pendingFiles);
   };
 
-  const upsertRecentConversation = (nextMessages, question, nextFiles = files) => {
+  const upsertRecentConversation = (nextMessages, question, nextFiles = files, generatedTitle = null) => {
     const recentConversationsKey = getRecentConversationsKey();
     const savedRecents = readJson(recentConversationsKey, []);
     const conversationId = effectiveProjectId || recentConversationIdRef.current;
+    
+    // 만약 이미 저장된 제목이 있거나 새로 생성된 제목이 있으면 그걸 우선으로 씀
+    const existing = savedRecents.find(item => item.id === conversationId || item.conversationId === conversationId);
+    
     const title =
+      generatedTitle ||
+      (existing && existing.title && existing.title !== question && existing.title !== '새 분석 대화' ? existing.title : null) ||
       currentProject?.title ||
       projectTitle ||
       restoredData?.projectTitle ||
@@ -358,9 +377,9 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
       let isJsonAsset = false;
       try {
         let cleanedAnswer = answer.replace(/```json/gi, '').replace(/```/g, '').trim();
-        if (cleanedAnswer.startsWith('[') && cleanedAnswer.endsWith(']')) {
+        if ((cleanedAnswer.startsWith('[') && cleanedAnswer.endsWith(']')) || (cleanedAnswer.startsWith('{') && cleanedAnswer.endsWith('}'))) {
           parsedAssetData = JSON.parse(cleanedAnswer);
-          if (Array.isArray(parsedAssetData)) {
+          if (typeof parsedAssetData === 'object' && parsedAssetData !== null) {
             isJsonAsset = true;
           }
         }
@@ -374,15 +393,14 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
       ];
 
       if (isJsonAsset) {
-        // AI가 JSON 배열로 응답했다면 표(Asset) 형태로 렌더링
+        // AI가 응답한 JSON 객체를 그대로 병합하되, 기존 호환성을 위해 role, id, title 보장
         const newVisual = {
+          ...parsedAssetData, // AI가 생성한 type, chartType, data 등을 전개
           id: `visual-${Date.now()}`,
           role: 'asset',
-          kind: 'table',
-          title: question.includes('차트') || question.includes('표') || question.includes('비교') ? question : '데이터 분석 표',
-          rows: parsedAssetData,
+          title: parsedAssetData.title || (question.includes('차트') || question.includes('표') || question.includes('비교') || question.includes('그래프') || question.includes('마인드맵') ? question : '데이터 시각화'),
           saved: false,
-          suggestedQuestions, // asset에도 추천 질문을 넣기 위해
+          suggestedQuestions,
         };
         messagesWithAnswer.push(newVisual);
         
@@ -393,7 +411,24 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
       }
 
       setMessages(messagesWithAnswer);
+      setMessages(messagesWithAnswer);
       upsertRecentConversation(messagesWithAnswer, question, pendingFiles);
+      
+      // 첫 질문인 경우, 백그라운드에서 AI 채팅방 제목 생성 호출
+      if (isNewConversation) {
+        analysisAPI.generateChatTitle(question, {
+          provider: llmProvider,
+          openaiApiKey,
+          googleApiKey,
+        }, getLatestAnalysisText(messages)).then(res => {
+          if (res.data?.title) {
+            upsertRecentConversation(messagesWithAnswer, question, pendingFiles, res.data.title);
+            // 사이드바 등 다른 컴포넌트가 최신 목록을 알 수 있도록 이벤트 발송
+            window.dispatchEvent(new Event('storage'));
+          }
+        }).catch(err => console.warn('Background title generation failed', err));
+      }
+      
     } catch (error) {
       const serverMessage = error.response?.data?.detail || error.response?.data?.message || error.message || '알 수 없는 오류가 발생했습니다.';
       const failureMessage = pendingFiles.length > 0
@@ -595,111 +630,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
   };
 
   const renderVisualPreview = (asset: any) => {
-    // 💡 1. 동적 테이블 렌더링 로직
-    if (asset.kind === 'table') {
-      let rows = asset.rows || [];
-      
-      // 혹시 AI가 문자열 형태로 보냈을 경우를 대비한 방어 코드
-      if (typeof rows === 'string') {
-        try { rows = JSON.parse(rows); } catch (e) { rows = []; }
-      }
-
-      // 표시할 기본 더미 데이터 생성 (AI 데이터가 없을 경우)
-      if (!Array.isArray(rows) || rows.length === 0) {
-        rows = makeVisualRows(['업로드 문서'], splitMeaningfulLines(asset.text || asset.desc));
-      }
-
-      // 💡 핵심: AI가 생성한 모든 객체의 키(Key)를 수집하여 중복 제거 (컬럼명 추출)
-      // 예: ["title", "PUE", "Energy_Loss_Reduction", ...]
-      const allKeys = Array.from(new Set(rows.flatMap(Object.keys)));
-
-      return (
-        // 컬럼 개수(allKeys.length)에 맞춰 CSS Grid를 동적으로 생성합니다!
-        <div className="mini-table" style={{ gridTemplateColumns: `repeat(${allKeys.length}, 1fr)` }}>
-          
-          {/* 1. 테이블 헤더 (컬럼 이름 렌더링) */}
-          {allKeys.map((key: any) => (
-            <div className="th" key={`th-${key}`}>
-              {key}
-            </div>
-          ))}
-          
-          {/* 2. 테이블 본문 데이터 렌더링 */}
-          {rows.flatMap((row: any, rIndex: number) =>
-            allKeys.map((key: any) => (
-              <div key={`td-${rIndex}-${key}`}>
-                {/* 데이터가 있으면 출력, 없으면 '-' 표시 */}
-                {row[key] !== undefined && row[key] !== null ? String(row[key]) : '-'}
-              </div>
-            ))
-          )}
-        </div>
-      );
-    }
-
-    // 💡 2. 그래프(Graph) 로직 (그래프는 수치가 필요하므로 최대한 score를 찾거나 임의 생성)
-    if (asset.kind === 'graph') {
-      const rows = asset.rows?.length ? asset.rows : [{ label: '핵심', score: 70 }, { label: '비교', score: 62 }];
-      const points = rows.slice(0, 5).map((row: any, index: number) => {
-        const x = 12 + index * (76 / Math.max(1, Math.min(rows.length, 5) - 1));
-        // 데이터에 score가 명시적으로 없으면 50으로 기본 처리 (방어 코드)
-        const numericScore = typeof row.score === 'number' ? row.score : (parseFloat(row.score) || 50);
-        const y = 92 - Math.max(12, Math.min(numericScore, 96)) * 0.78;
-        return `${x},${y}`;
-      });
-      return (
-        <div className="mini-graph">
-          <svg className="graph-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <polyline points={points.join(' ')} />
-            {points.map((point: string) => {
-              const [cx, cy] = point.split(',');
-              return <circle key={point} cx={cx} cy={cy} r="2.2" />;
-            })}
-          </svg>
-          <div className="axis y-axis">수치</div>
-          <div className="axis x-axis">자료</div>
-          {rows.slice(0, 5).map((row: any, i: number) => {
-            const label = row.label || row.title || row.name || `항목 ${i+1}`;
-            const numericScore = typeof row.score === 'number' ? row.score : (parseFloat(row.score) || 50);
-            return (
-              <div className="bar-wrap" key={`bar-${label}-${i}`}>
-                <div className="bar" style={{ height: `${Math.max(28, Math.min(numericScore, 96))}%` }} />
-                <strong>{numericScore}</strong>
-                <span>{label}</span>
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-
-    // 💡 3. 마인드맵 로직
-    if (asset.kind === 'mindmap') {
-      const branches = asset.branches?.length
-        ? asset.branches
-        : splitMeaningfulLines(asset.text || asset.desc).slice(0, 4);
-      return (
-        <div className="mini-mindmap">
-          <div className="center-node">{asset.title}</div>
-          <div className="tree-trunk" aria-hidden="true"></div>
-          <div className="branches">
-            {branches.slice(0, 5).map((branch: string, index: number) => (
-              <span className={`branch branch-${index + 1}`} key={`${branch}-${index}`}>{branch}</span>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    // 💡 4. 이미지(기본) 로직
-    return (
-      <div className="mini-image">
-        <div className="image-title">{asset.desc || asset.title}</div>
-        <div className="chips">
-          {(asset.keywords || []).slice(0, 6).map((keyword: string) => <span key={keyword}>{keyword}</span>)}
-        </div>
-      </div>
-    );
+    return <DynamicVisualizer config={asset} fallbackTitle={asset.title} />;
   };
 
   const renderVisualArtifact = (asset, compact = false, isModal = false) => (
@@ -851,11 +782,11 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
                   <UserRow><div className="user-box">{message.text}</div></UserRow>
                 ) : message.role === 'asset' ? (
                   <AiRow>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '80%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '85%', minWidth: '450px' }}>
                       {renderVisualArtifact(message)}
                       {message.suggestedQuestions && message.suggestedQuestions.length > 0 && (
                         <div className="suggested-questions">
-                          {message.suggestedQuestions.map((q, idx) => (
+                          {message.suggestedQuestions.map((q: string, idx: number) => (
                             <button 
                               key={idx} 
                               className="suggested-chip" 

@@ -66,10 +66,34 @@ def _build_prompts(question: str, extracted_docs: list[dict], analysis_text: str
         "[기능적 지시사항]\n"
         "- 요약 요청 시: 업로드된 문서의 성격(학술 논문, 비즈니스 보고서, 회의록, 기사 등)을 파악하여 가장 적합한 3~4개의 핵심 항목으로 구조화하여 요약하십시오.\n"
         "  각 항목 앞에는 내용에 어울리는 직관적인 이모지를 붙이십시오.\n"
-        "- 다중 문서 비교 요청 시: 문서 간의 공통점과 차이점을 대조하여 명확히 비교하십시오.\n"
-        "- 표(Table) 시각화 데이터 요청 시: 고정된 형식(예: 단순 '제목/내용' 요약)에 얽매이지 말고, 데이터의 성격(성능 비교, 시계열, 개념 분류 등)을 파악하여 가장 직관적으로 읽힐 수 있는 최적의 표 구조(Column)를 스스로 기획하십시오.\n"
-        "  반드시 부연 설명 없이 JSON 배열(Array of Objects) 형식으로만 응답해야 하며, Key 이름은 영문이나 한글로 명확히 지정하십시오.\n"
-        "  (예: 성능 비교일 경우 [{\"모델\": \"A\", \"정확도\": \"95%\", \"속도\": \"빠름\"}], 개념 정리일 경우 [{\"개념명\": \"X\", \"작동 원리\": \"...\"}])\n\n"
+        "- 시각화(표/그래프/마인드맵) 데이터 요청 시: AI가 데이터의 성격을 분석하여 가장 직관적인 시각화 형태(table, bar, line, pie, mindmap)를 스스로 결정하고, 아래의 '표준 JSON 스키마' 형식을 엄격하게 지켜 응답하십시오. **절대로 부연 설명이나 마크다운 코드블록(```json) 없이 순수 JSON 객체(Object) 단 하나만 반환하십시오.**\n\n"
+        "  [표준 JSON 스키마 구조]\n"
+        "  {\n"
+        "    \"type\": \"chart\",  // chart, table, mindmap 중 택1\n"
+        "    \"theme\": {          // AI가 스스로 선택한 테마 디자인 (선택사항, 색상은 HEX 코드)\n"
+        "      \"headerBackground\": \"#1e293b\",\n"
+        "      \"headerTextColor\": \"#ffffff\",\n"
+        "      \"cellBackground\": \"#f8fafc\",\n"
+        "      \"cellTextColor\": \"#334155\",\n"
+        "      \"borderColor\": \"#cbd5e1\"\n"
+        "    },\n"
+        "    \"chartType\": \"line\",  // chart인 경우 필수: bar, line, pie 중 택1\n"
+        "    \"xAxisKey\": \"name\", // chart인 경우 X축으로 사용할 기준 컬럼명 (pie인 경우 nameKey로 사용됨)\n"
+        "    \"columns\": [        // table인 경우 필수 (표의 헤더 및 순서 정의)\n"
+        "      {\"key\": \"model\", \"label\": \"AI 모델\"},\n"
+        "      {\"key\": \"score\", \"label\": \"정확도\"}\n"
+        "    ],\n"
+        "    \"series\": [         // chart인 경우 필수 (표시할 데이터 종류 및 색상 정의, 다중 데이터 지원!)\n"
+        "      {\"dataKey\": \"score\", \"color\": \"#0ea5a4\", \"name\": \"정확도 점수\", \"yAxisId\": \"left\"},\n"
+        "      {\"dataKey\": \"speed\", \"color\": \"#f59e0b\", \"name\": \"처리 속도\", \"yAxisId\": \"right\"} // 데이터 단위(Scale)가 전혀 다를 경우 반드시 right 사용!\n"
+        "    ],\n"
+        "    \"data\": [           // 실제 데이터 배열 (모든 type 공통)\n"
+        "      {\"name\": \"GPT-4\", \"model\": \"GPT-4\", \"score\": 95, \"speed\": 800000},\n"
+        "      {\"name\": \"Claude 3\", \"model\": \"Claude 3\", \"score\": 94, \"speed\": 850000}\n"
+        "    ]\n"
+        "  }\n"
+        "  * 주의: 이 JSON 스키마를 사용하여 AI가 다중 비교, 복잡한 표, 파이 차트 등을 완전히 자유롭게 기획하십시오. 특히 theme 객체를 활용하여 표의 시각적 디자인(다크모드, 파스텔톤 등)까지 직접 결정하십시오.\n"
+        "  * 꿀팁: 두 데이터의 단위가 너무 차이 나는 경우(예: 하나는 1.5%이고 하나는 500,000명), 반드시 하나의 series에는 'yAxisId: \"left\"', 다른 series에는 'yAxisId: \"right\"'를 주어 듀얼 축(Dual Axis) 차트로 생성하세요!\n\n"
         "응답의 제일 마지막 줄에는 항상 '===SUGGESTED_QUESTIONS===' 이라는 구분선을 넣고, "
         "그 아래에 사용자가 이어서 질문하면 좋을 만한 추천 질문을 2~3개 작성하십시오.\n\n"
         "[추천 질문 작성 시 엄격한 규칙]\n"
@@ -217,3 +241,47 @@ def analyze_with_llm(
     if not api_key:
         return _llm_error("OpenAI API 키가 없어 기본 문서 추출로 응답했습니다.", "openai")
     return _analyze_with_openai(question, extracted_docs, api_key, analysis_text)
+
+
+def generate_chat_title(
+    question: str,
+    provider: str = "openai",
+    openai_api_key: str | None = None,
+    google_api_key: str | None = None,
+    analysis_text: str = ""
+) -> str:
+    """사용자의 첫 질문을 바탕으로 3~5단어의 짧은 제목을 생성합니다."""
+    prompt = f"다음 질문(또는 분석 요청)을 바탕으로 대화방의 제목을 3~5단어 내외의 짧은 명사형으로 작성해.\n\n질문: {question}\n\n오직 제목만 출력할 것."
+    
+    normalized_provider = (provider or "openai").lower()
+
+    if normalized_provider == "google":
+        api_key = google_api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            return question[:20]
+        try:
+            from google import genai
+            client = genai.Client(api_key=api_key)
+            model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+            response = client.models.generate_content(model=model, contents=prompt)
+            return (getattr(response, "text", "") or "").strip().replace('"', '').replace("'", "")
+        except Exception:
+            return question[:20]
+
+    api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return question[:20]
+    
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=20
+        )
+        return response.choices[0].message.content.strip().replace('"', '').replace("'", "")
+    except Exception:
+        return question[:20]

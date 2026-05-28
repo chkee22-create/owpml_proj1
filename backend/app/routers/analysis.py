@@ -99,3 +99,25 @@ async def analyze_chat(
         "model": llm_answer.get("model"),
         "suggested_questions": llm_answer.get("suggested_questions", []),
     }
+
+@router.post("/title")
+async def generate_title(
+    question: str = Form(""),
+    llm_provider: str = Form("openai"),
+    openai_api_key: str = Form(""),
+    google_api_key: str = Form(""),
+    analysis_text: str = Form("")
+):
+    selected_provider = llm_provider.strip() or "openai"
+    
+    from ..services.llm_analysis import generate_chat_title
+    
+    title = generate_chat_title(
+        question,
+        provider=selected_provider,
+        openai_api_key=openai_api_key.strip() or None,
+        google_api_key=google_api_key.strip() or None,
+        analysis_text=analysis_text.strip()
+    )
+    
+    return {"title": title}
