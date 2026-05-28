@@ -26,7 +26,7 @@ import {
   getProjectsKey,
   getRecentConversationsKey,
   readJson,
-  SHARED_PROJECTS_KEY,
+  upsertSharedProjectIndex,
   writeJson,
 } from '../utils/storageKeys';
 
@@ -463,16 +463,13 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
         : []),
     ].slice(0, MAX_RECENT_CONVERSATIONS));
 
-    const sharedProjects = readJson(SHARED_PROJECTS_KEY, []);
-    writeJson(SHARED_PROJECTS_KEY, [
-      projectRecord,
-      ...(Array.isArray(sharedProjects)
-        ? sharedProjects.filter((project) => project.id !== projectRecord.id && project.inviteCode !== projectRecord.inviteCode)
-        : []),
-    ].slice(0, 100));
+    upsertSharedProjectIndex(projectRecord);
 
     try {
-      await projectAPI.save(projectRecord);
+      const response = await projectAPI.save(projectRecord);
+      if (response.data?.project) {
+        upsertSharedProjectIndex(response.data.project);
+      }
     } catch (error) {
       console.warn('MongoDB project save skipped:', error);
     }
