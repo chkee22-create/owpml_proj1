@@ -1,68 +1,30 @@
 # PaperMate Backend
 
-FastAPI로 만든 PaperMate 백엔드입니다. 로그인, 프로젝트 저장, 문서 분석, 시각화 자료, 공유방 데이터를 처리합니다.
+FastAPI로 만든 PaperMate 백엔드입니다. Docker 실행은 프로젝트 루트에서 합니다.
 
-## 실행 방법
+## Docker 실행
 
-백엔드 폴더로 이동합니다.
-
-```bat
-cd backend
-```
-
-가상환경을 만들고 켭니다.
+Docker Desktop을 켠 뒤 프로젝트 루트에서 실행합니다.
 
 ```bat
-python -m venv venv
-venv\Scripts\activate
+copy backend\.env.example backend\.env
+docker compose up --build
 ```
 
-필요한 패키지를 설치합니다.
+브라우저는 아래 주소로 접속합니다.
 
-```bat
-pip install -r requirements.txt
+```text
+http://127.0.0.1:3000
 ```
 
-환경변수 파일을 준비합니다.
-
-```bat
-copy .env.example .env
-```
-
-MongoDB를 켭니다.
-
-```bat
-docker start project-mongo-1
-```
-
-서버를 실행합니다.
-
-```bat
-python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-서버 확인 주소입니다.
+백엔드 상태 확인 주소입니다.
 
 ```text
 http://127.0.0.1:8000/api/health
 http://127.0.0.1:8000/api/ready
 ```
 
-## Docker 실행
-
-프로젝트 루트에서 실행합니다.
-
-```bat
-docker compose up --build
-```
-
-운영 모드로 실행할 때는 프로젝트 루트에서 아래 명령을 사용합니다.
-
-```bat
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build
-```
-
-컨테이너 구성은 아래와 같습니다.
+## 컨테이너 구성
 
 ```text
 frontend  nginx로 React 빌드 파일 서빙, /api 요청을 backend로 프록시
@@ -70,11 +32,17 @@ backend   FastAPI + Uvicorn
 mongo     MongoDB 7
 ```
 
-접속 주소입니다.
+## 백엔드만 직접 실행
 
-```text
-프론트엔드: http://127.0.0.1:3000
-백엔드 상태: http://127.0.0.1:8000/api/health
+Docker 없이 백엔드만 따로 확인할 때 사용합니다.
+
+```bat
+cd backend
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 ## 트리 구조
