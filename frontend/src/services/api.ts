@@ -10,6 +10,9 @@ interface AnalysisChatOptions {
   googleApiKey?: string;
 }
 
+const isBrowserFile = (file: unknown): file is File =>
+  typeof File !== 'undefined' && file instanceof File;
+
 const getApiBaseUrl = () => {
   // TypeScript 변경 표시: Vite에서는 CRA의 process.env 대신 import.meta.env로 환경변수를 읽습니다.
   const configuredUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL;
@@ -48,7 +51,11 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const requestUrl = error.config?.url || '';
+    const isAuthSubmitRequest =
+      requestUrl.includes('/api/auth/login') || requestUrl.includes('/api/auth/signup');
+
+    if (error.response?.status === 401 && !isAuthSubmitRequest) {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('username');
@@ -87,24 +94,16 @@ export const analysisAPI = {
     if (options.openaiApiKey) formData.append('openai_api_key', options.openaiApiKey);
     if (options.googleApiKey) formData.append('google_api_key', options.googleApiKey);
     if (analysisText) formData.append('analysis_text', analysisText);
-    files.forEach((file) => {
-      if (file instanceof File || file instanceof Blob) {
-        formData.append('files', file);
-      }
-    });
+    files.filter(isBrowserFile).forEach((file) => formData.append('files', file, file.name));
 
-    return apiClient.post('/api/analysis/chat', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return apiClient.post('/api/analysis/chat', formData);
   },
   createVisual: (type: string, files: File[], analysisText = '') => {
     const formData = new FormData();
     formData.append('analysis_text', analysisText);
-    files.forEach((file) => formData.append('files', file));
+    files.filter(isBrowserFile).forEach((file) => formData.append('files', file, file.name));
 
-    return apiClient.post(`/api/visuals/${encodeURIComponent(type)}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return apiClient.post(`/api/visuals/${encodeURIComponent(type)}`, formData);
   },
 };
 

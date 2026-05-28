@@ -1,27 +1,83 @@
 # PaperMate Backend
 
-FastAPI로 만든 PaperMate API 서버입니다.
+FastAPI로 만든 PaperMate 백엔드입니다. Docker 실행은 프로젝트 루트에서 합니다.
 
-## CMD 실행 순서
+## Docker 실행
+
+Docker Desktop을 켠 뒤 프로젝트 루트에서 실행합니다.
 
 ```bat
-python -m venv .venv
-.venv\Scripts\activate.bat
-pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+copy backend\.env.example backend\.env
+docker compose up --build
 ```
 
-## 주요 API
+브라우저는 아래 주소로 접속합니다.
 
-- `GET /api/health`: 서버와 MongoDB 연결 상태를 확인합니다.
-- `POST /api/auth/signup`: 회원가입을 처리합니다.
-- `POST /api/auth/login`: 로그인을 처리하고 JWT 토큰을 발급합니다.
-- `POST /api/analysis/chat`: 업로드한 문서와 질문을 받아 분석 결과를 반환합니다.
-- `POST /api/visuals/{type}`: 분석 결과를 표, 그래프, 마인드맵 등으로 변환합니다.
-- `GET /api/projects`: 로그인한 사용자의 프로젝트 목록을 불러옵니다.
+```text
+http://127.0.0.1:3000
+```
 
-## 참고
+백엔드 상태 확인 주소입니다.
 
-MongoDB가 꺼져 있어도 문서 분석 라우터는 서버 시작 단계에서 바로 죽지 않도록 처리되어 있습니다. 다만 로그인, 프로젝트 저장처럼 DB가 필요한 기능은 MongoDB가 실행 중이어야 정상 동작합니다.
+```text
+http://127.0.0.1:8000/api/health
+http://127.0.0.1:8000/api/ready
+```
 
-프론트엔드는 Vite로 빌드되며, 배포 빌드 결과는 `frontend/dist` 폴더에 만들어집니다.
+## 컨테이너 구성
+
+```text
+frontend  nginx로 React 빌드 파일 서빙, /api 요청을 backend로 프록시
+backend   FastAPI + Uvicorn
+mongo     MongoDB 7
+```
+
+## 백엔드만 직접 실행
+
+Docker 없이 백엔드만 따로 확인할 때 사용합니다.
+
+```bat
+cd backend
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+## 트리 구조
+
+```text
+backend/
+  main.py                  FastAPI 앱 시작 파일
+  requirements.txt         Python 패키지 목록
+  .env.example             환경변수 예시 파일
+  Dockerfile               백엔드 Docker 이미지 설정
+
+  app/
+    core/
+      config.py            환경변수와 서버 설정
+      database.py          MongoDB 연결과 인덱스
+      deps.py              로그인 사용자 확인
+      security.py          비밀번호 해시와 JWT 토큰
+      uploads.py           업로드 파일 개수/용량 검사
+
+    routers/
+      auth.py              회원가입, 로그인, 계정 관리
+      projects.py          프로젝트 저장, 조회, 삭제
+      analysis.py          문서 분석 Q&A
+      visuals.py           표, 그래프, 이미지, 마인드맵 생성
+      visual_assets.py     시각화 보관함 저장
+      shared_rooms.py      공유방 저장
+      discussion_comments.py 공유방 댓글 저장
+      project_threads.py   분석 대화 기록 저장
+      project_files.py     파일 메타데이터 저장
+
+    services/
+      document_analysis.py 문서 텍스트 추출과 기본 분석
+      llm_analysis.py      OpenAI/Gemini 호출 연결부
+      visual_buttons/      시각화 버튼별 생성 로직
+
+  models/
+    schemas.py             API 요청/응답 데이터 모양
+```

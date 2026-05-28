@@ -23,10 +23,13 @@ import {
   getRecentConversationsKey,
   getSharedRoomKey,
   getShareRoomKey,
+  mergeProjectsIntoSharedIndex,
   readJson,
   SHARED_PROJECTS_KEY,
+  upsertProjectByIdOrInvite,
   writeJson,
 } from '../utils/storageKeys';
+import { projectAPI } from '../services/api';
 import { VisualArtifact } from './styles/AnalysisLocal.styles';
 
 const MAX_PROJECTS = 10;
@@ -179,6 +182,16 @@ const normalizeProjects = (projects) =>
     .slice(0, MAX_PROJECTS)
     .map(normalizeProject);
 
+const mergeProjectLists = (primaryProjects, fallbackProjects) => {
+  const merged = [];
+  asArray([...asArray(primaryProjects), ...asArray(fallbackProjects)]).forEach((project) => {
+    if (!project?.id && !project?.inviteCode) return;
+    const exists = merged.some((item) => item.id === project.id || item.inviteCode === project.inviteCode);
+    if (!exists) merged.push(project);
+  });
+  return normalizeProjects(merged);
+};
+
 const createInviteCode = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   return Array.from({ length: 7 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -198,6 +211,7 @@ const loadProjects = () => {
 const persistProjects = (projects) => {
   const nextProjects = normalizeProjects(projects);
   writeJson(getProjectsKey(), nextProjects);
+  mergeProjectsIntoSharedIndex(nextProjects);
   return nextProjects;
 };
 
@@ -272,6 +286,7 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
   const [expandedVisual, setExpandedVisual] = useState(null);
   const [isViewAllOpen, setIsViewAllOpen] = useState(false);
   const [limitNotice, setLimitNotice] = useState('');
+  const [syncNotice, setSyncNotice] = useState('');
 
   const visuals = useMemo(
     () =>
@@ -290,22 +305,40 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
   const commitProjects = (nextProjects) => {
     const normalizedProjects = persistProjects(nextProjects);
     setProjects(normalizedProjects);
+    projectAPI.sync(normalizedProjects).catch((error) => {
+      console.warn('MongoDB project sync skipped:', error);
+      setSyncNotice('백엔드 동기화에 실패해 브라우저 저장소에 먼저 보관했습니다.');
+    });
     return normalizedProjects;
   };
 
   useEffect(() => {
+    let isMounted = true;
+
+    projectAPI.list()
+      .then((response) => {
+        if (!isMounted) return;
+        const serverProjects = response.data?.projects;
+        if (!Array.isArray(serverProjects)) return;
+
+        const mergedProjects = mergeProjectLists(serverProjects, loadProjects());
+        persistProjects(mergedProjects);
+        setProjects(mergedProjects);
+        setSyncNotice('');
+      })
+      .catch((error) => {
+        console.warn('MongoDB project load skipped:', error);
+        if (isMounted) setSyncNotice('백엔드 프로젝트 목록을 불러오지 못해 브라우저 저장소 기준으로 표시합니다.');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     writeJson(getProjectsKey(), normalizeProjects(projects));
-    const sharedProjects = readJson(SHARED_PROJECTS_KEY, []);
-    const ownProjectsWithInvite = asArray(projects).filter((project) => project?.inviteCode);
-    if (ownProjectsWithInvite.length === 0) return;
-
-    const ownIds = new Set(ownProjectsWithInvite.map((project) => project.id));
-    const ownInviteCodes = new Set(ownProjectsWithInvite.map((project) => project.inviteCode));
-    const otherSharedProjects = Array.isArray(sharedProjects)
-      ? sharedProjects.filter((project) => !ownIds.has(project.id) && !ownInviteCodes.has(project.inviteCode))
-      : [];
-
-    writeJson(SHARED_PROJECTS_KEY, [...ownProjectsWithInvite, ...otherSharedProjects].slice(0, 100).map(normalizeProject));
+    mergeProjectsIntoSharedIndex(projects);
   }, [projects]);
 
   useEffect(() => {
@@ -362,6 +395,10 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
 
     deleteProjectEverywhere(project.id);
     commitProjects(asArray(projects).filter((item) => item.id !== project.id));
+    projectAPI.delete(project.id).catch((error) => {
+      console.warn('MongoDB project delete skipped:', error);
+      setSyncNotice('백엔드 삭제 반영에 실패해 브라우저 저장소에서 먼저 삭제했습니다.');
+    });
     if (editingProjectId === project.id) setEditingProjectId(null);
     setLimitNotice('');
   };
@@ -483,6 +520,11 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
       {limitNotice && (
         <div style={{ margin: '0 0 18px 0', color: '#dc2626', fontSize: '13px', fontWeight: 700 }}>
           {limitNotice}
+        </div>
+      )}
+      {syncNotice && (
+        <div style={{ margin: '0 0 18px 0', color: '#64748b', fontSize: '13px', fontWeight: 700 }}>
+          {syncNotice}
         </div>
       )}
 
