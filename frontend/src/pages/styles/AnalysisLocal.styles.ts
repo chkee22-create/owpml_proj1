@@ -15,15 +15,54 @@ export const MainLayout = styled.div`
 `;
 
 export const VisualPanel = styled.div`
-  flex: 0 0 30%;
-  min-width: 280px;
+  flex: 0 0 clamp(420px, 46%, 720px);
+  min-width: 420px;
   border-right: 1px solid #e2e8f0;
-  padding: 16px;
+  padding: 12px;
   overflow: hidden;
   background: #f8fafc;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
+
+  > .title,
+  > .hint,
+  > .asset-list {
+    display: none;
+  }
+
+  .compare-shell {
+    display: grid;
+    grid-template-columns: minmax(260px, var(--source-pane-width, 58%)) 10px minmax(220px, 1fr);
+    gap: 8px;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .compare-shell.is-resizing {
+    cursor: col-resize;
+  }
+
+  .source-pane,
+  .visual-library {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #ffffff;
+    overflow: hidden;
+  }
+
+  .panel-head {
+    min-height: 68px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+  }
 
   .title {
     font-size: 14px;
@@ -37,6 +76,127 @@ export const VisualPanel = styled.div`
     font-size: 12px;
     font-weight: 650;
     line-height: 1.45;
+  }
+
+  .pane-resizer {
+    position: relative;
+    min-width: 10px;
+    cursor: col-resize;
+    border-radius: 8px;
+    background: transparent;
+  }
+
+  .pane-resizer::before {
+    content: "";
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: #cbd5e1;
+    transition: width 0.15s ease, background 0.15s ease;
+  }
+
+  .pane-resizer:hover::before,
+  .compare-shell.is-resizing .pane-resizer::before {
+    width: 4px;
+    background: #0ea5a4;
+  }
+
+  .source-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    border-bottom: 1px solid #e2e8f0;
+    overflow-x: auto;
+    background: #f8fafc;
+  }
+
+  .source-tabs button {
+    max-width: 150px;
+    min-height: 30px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #475569;
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+
+  .source-tabs button.active {
+    border-color: #0ea5a4;
+    background: #f0fdfa;
+    color: #0f766e;
+  }
+
+  .source-preview {
+    flex: 1;
+    min-height: 0;
+    background: #f8fafc;
+    overflow: auto;
+  }
+
+  .source-frame {
+    width: 100%;
+    height: 100%;
+    min-height: 420px;
+    border: 0;
+    background: #ffffff;
+  }
+
+  .source-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+  }
+
+  .source-text {
+    margin: 0;
+    min-height: 100%;
+    padding: 14px;
+    color: #334155;
+    background: #ffffff;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .source-empty {
+    min-height: 220px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    text-align: center;
+    color: #64748b;
+  }
+
+  .source-empty strong {
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 850;
+  }
+
+  .source-empty span {
+    max-width: 320px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.55;
   }
 
   .asset-list {
@@ -111,6 +271,14 @@ export const VisualPanel = styled.div`
     border-right: none;
     border-bottom: 1px solid #e2e8f0;
     max-height: 44vh;
+
+    .compare-shell {
+      grid-template-columns: 1fr;
+    }
+
+    .pane-resizer {
+      display: none;
+    }
   }
 `;
 
@@ -215,33 +383,40 @@ export const VisualArtifact = styled.div`
 
   .mini-table {
     display: grid;
-    /* grid-template-columns는 이제 인라인 스타일로 동적으로 설정됨 */
-    gap: 1px; /* 💡 셀 사이의 간격을 1px로 주고 배경색을 통해 자동으로 테두리를 만듭니다. */
-    background: #cbd5e1; /* 외곽선 및 내부 테두리 색상 */
+    gap: 1px;
+    background: #e2e8f0; /* 얇은 회색 테두리 효과 */
     border: 1px solid #cbd5e1;
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
 
     div {
       background: #ffffff;
-      padding: 10px 14px;
+      padding: 12px 16px;
       color: #334155;
       font-size: 13px;
-      font-weight: 600;
-      min-height: 38px;
-      line-height: 1.4;
+      font-weight: 500;
+      min-height: 44px;
+      line-height: 1.5;
       display: flex;
       align-items: center;
       justify-content: flex-start;
-      word-break: keep-all; /* 단어 끊어짐 방지 */
+      word-break: keep-all;
+      transition: background-color 0.2s ease;
+    }
+
+    div:hover {
+      background: #f8fafc; /* 살짝 호버 효과 */
     }
 
     .th {
-      background: #0f766e;
-      color: #ffffff;
-      font-weight: 700;
-      justify-content: center;
-      text-align: center;
+      background: #f1f5f9; /* 헤더를 깔끔한 연한 회색으로 변경 */
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 2px solid #cbd5e1;
     }
   }
 
@@ -299,30 +474,7 @@ export const VisualArtifact = styled.div`
     }
 
     .graph-line {
-      position: absolute;
-      left: 34px;
-      right: 16px;
-      top: 18px;
-      bottom: 30px;
-      width: calc(100% - 50px);
-      height: calc(100% - 48px);
-      overflow: visible;
-      z-index: 2;
-
-      polyline {
-        fill: none;
-        stroke: #dc2626;
-        stroke-width: 3.4;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        filter: drop-shadow(0 2px 3px rgba(220, 38, 38, 0.22));
-      }
-
-      circle {
-        fill: #ffffff;
-        stroke: #dc2626;
-        stroke-width: 2.4;
-      }
+      display: none; /* 기존의 못생긴 붉은 꺾은선 그래프는 제거하고 깔끔한 막대 그래프로 통일합니다. */
     }
 
     .bar-wrap {
@@ -331,19 +483,29 @@ export const VisualArtifact = styled.div`
       flex-direction: column;
       align-items: center;
       justify-content: flex-end;
-      gap: 6px;
+      gap: 8px;
       min-width: 0;
       height: 100%;
       position: relative;
       z-index: 1;
+      cursor: pointer;
     }
 
     .bar {
       width: 100%;
-      max-width: 46px;
-      border-radius: 8px 8px 2px 2px;
-      background: linear-gradient(180deg, #14b8a6 0%, #2563eb 100%);
-      box-shadow: 0 6px 12px rgba(37, 99, 235, 0.18);
+      max-width: 42px;
+      border-radius: 6px 6px 0 0;
+      background: linear-gradient(180deg, rgba(14, 165, 164, 0.85) 0%, rgba(14, 165, 164, 0.15) 100%);
+      border: 1px solid rgba(14, 165, 164, 0.4);
+      border-bottom: none;
+      box-shadow: 0 -4px 16px rgba(14, 165, 164, 0.15);
+      transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    .bar-wrap:hover .bar {
+      background: linear-gradient(180deg, rgba(14, 165, 164, 1) 0%, rgba(14, 165, 164, 0.3) 100%);
+      transform: translateY(-4px);
+      box-shadow: 0 -6px 20px rgba(14, 165, 164, 0.3);
     }
 
     strong {

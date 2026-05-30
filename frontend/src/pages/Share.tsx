@@ -17,20 +17,20 @@ import {
   ChatTimelineFeed,
   TalkBubble,
   FooterInputBox,
+  VisualModalOverlay,
+  VisualModalPanel,
 } from './styles/Share.styles';
 import {
   getProjectsKey,
   getRecentConversationsKey,
   getSharedRoomKey,
   getShareRoomKey,
-  normalizeInviteCode,
   readJson,
   SHARED_PROJECTS_KEY,
-  upsertProjectByIdOrInvite,
   writeJson,
 } from '../utils/storageKeys';
 import { getSharedImage, putSharedImage } from '../utils/imageStore';
-import { projectAPI } from '../services/api';
+import { DynamicVisualizer } from '../components/DynamicVisualizer';
 
 // Share 페이지의 새 역할:
 // 프로젝트를 고르는 화면이 아니라, 초대코드로 들어온 프로젝트 결과물을 보며 코멘트를 남기는 저장형 토론방입니다.
@@ -120,10 +120,143 @@ const getProjectOwner = (project, room) =>
   asArray(room?.members)[0]?.name ||
   '프로젝트 주인';
 
-const upsertProjectByIdOrCode = (projects, project) => {
-  if (!project?.id && !project?.inviteCode) return sanitizeProjects(projects);
+const normalizeVisualId = (id) => String(id || '').replace(/^(thread-|visual-|saved-)+/, '');
 
-  return sanitizeProjects(upsertProjectByIdOrInvite(projects, project, 100));
+const isGraphRequestBetter = (text = '') => /그래프|차트|막대|꺾은선|선\s*그래프|graph|chart|line|bar/i.test(String(text));
+
+const looksLikeTimeSeries = (xAxisKey, data = []) => {
+  const keyText = String(xAxisKey || '').toLowerCase();
+  if (/월|month|date|year|연도|년도|기간|시점|분기|quarter/.test(keyText)) return true;
+  return data.some((row) => {
+    const label = String(row?.[xAxisKey] ?? '');
+    return /^\d{1,2}월$/.test(label) || /^\d{4}[-.]\d{1,2}/.test(label) || /^\d{4}년?$/.test(label);
+  });
+};
+
+const normalizeSeriesName = (value) => String(value ?? '').trim();
+
+const pivotLongChartData = (data) => {
+  if (!Array.isArray(data) || data.length === 0 || typeof data[0] !== 'object') return null;
+
+  const keys = Object.keys(data[0]);
+  const xAxisKey =
+    keys.find((key) => /월|month|date|기간|시점|분기|quarter/i.test(key)) ||
+    keys.find((key) => data.some((row) => /^\d{1,2}월$/.test(String(row?.[key] ?? ''))));
+  const groupKey =
+    keys.find((key) => key !== xAxisKey && /년|year|source|file|자료|문서|category|group|series/i.test(key)) ||
+    keys.find((key) => key !== xAxisKey && data.some((row) => /^(?:\d{4}년?p?|\d{4}p?)$/i.test(String(row?.[key] ?? '').trim())));
+  const valueKey = keys.find(
+    (key) => key !== xAxisKey && key !== groupKey && data.some((row) => Number.isFinite(Number(row?.[key])))
+  );
+
+  if (!xAxisKey || !groupKey || !valueKey) return null;
+
+  const rowMap = new Map();
+  const groups = [];
+  data.forEach((row) => {
+    const xLabel = normalizeSeriesName(row?.[xAxisKey]);
+    const groupLabel = normalizeSeriesName(row?.[groupKey]);
+    if (!xLabel || !groupLabel) return;
+    if (!groups.includes(groupLabel)) groups.push(groupLabel);
+    const current = rowMap.get(xLabel) || { [xAxisKey]: xLabel };
+    const value = Number(row?.[valueKey]);
+    current[groupLabel] = Number.isFinite(value) ? value : null;
+    rowMap.set(xLabel, current);
+  });
+
+  if (rowMap.size === 0 || groups.length < 2) return null;
+
+  return {
+    xAxisKey,
+    data: Array.from(rowMap.values()),
+    series: groups.map((group, index) => ({
+      dataKey: group,
+      name: group,
+      color: ['#94a3b8', '#64748b', '#0f172a', '#0ea5a4', '#2563eb', '#f59e0b'][index % 6],
+      yAxisId: 'left',
+    })),
+  };
+};
+
+const isGraphRequest = (text = '') => /그래프|차트|막대|꺾은선|선\s*그래프|graph|chart/i.test(String(text));
+
+const isIntroMessage = (text = '') =>
+  String(text || '').includes('분석을 시작하려면 파일을 업로드하거나 차트를 생성하세요') ||
+  String(text || '').includes('분석을 시작하려면 파일을 업로드한 뒤 질문을 입력하세요');
+
+const splitEvidenceSections = (text = '') => {
+  const normalizedText = String(text || "")
+    .replace(/\[(?:관련\s*문서|관련\s*문서\s*구간)\]/g, "[관련 문서 구간]")
+    .replace(/\[(?:문서별\s*핵심\s*(?:근거|발췌))\]/g, "[문서별 핵심 근거]");
+  const sectionPattern = /(\[(?:수치 후보|관련 문서 구간|문서별 핵심 근거)\])/g;
+  const parts = normalizedText.split(sectionPattern);
+  const main = (parts.shift() || '').trim();
+  const evidence = [];
+
+  for (let index = 0; index < parts.length; index += 2) {
+    const title = parts[index]?.replace(/^\[|\]$/g, '').trim();
+    const body = parts[index + 1]?.trim();
+    if (title && body) evidence.push({ title, body });
+  }
+
+  return { main, evidence };
+};
+
+const hasVisualPayload = (asset = {}) => {
+  const data = Array.isArray(asset.data) ? asset.data : [];
+  const rows = Array.isArray(asset.rows) ? asset.rows : [];
+  const columns = Array.isArray(asset.columns) ? asset.columns : [];
+  const series = Array.isArray(asset.series) ? asset.series : [];
+  return data.length > 0 || rows.length > 0 || columns.length > 0 || series.length > 0;
+};
+
+const hasTimelineAssetContent = (asset = {}) => {
+  if (!asset) return false;
+  if (asset.type === 'question' || asset.type === 'answer') return Boolean(String(asset.text || '').trim());
+  if (asset.type === 'visual') return hasVisualPayload(asset);
+  if (asset.type === 'image') return Boolean(asset.dataUrl || asset.hasImage);
+  return Boolean(String(asset.text || '').trim()) || hasVisualPayload(asset);
+};
+
+const coerceGraphAsset = (asset, promptText = '') => {
+  if (!isGraphRequestBetter(promptText) && !isGraphRequest(promptText)) return asset;
+  if (asset.chartType || (Array.isArray(asset.series) && asset.series.length > 0)) return asset;
+  const data = Array.isArray(asset.data) && asset.data.length > 0 ? asset.data : [];
+  if (data.length === 0 || typeof data[0] !== 'object') return asset;
+
+  const pivoted = pivotLongChartData(data);
+  if (pivoted) {
+    return {
+      ...asset,
+      type: 'chart',
+      kind: 'chart',
+      chartType: 'line',
+      xAxisKey: pivoted.xAxisKey,
+      data: pivoted.data,
+      series: pivoted.series,
+    };
+  }
+
+  const keys = Object.keys(data[0]);
+  const xAxisKey = keys.find((key) => data.some((row) => typeof row?.[key] === 'string')) || keys[0];
+  const numericKeys = keys.filter((key) => key !== xAxisKey && data.some((row) => Number.isFinite(Number(row?.[key]))));
+  if (numericKeys.length === 0) return asset;
+  const shouldUseLine = /선|꺾은선|line|추이|월별|연도별|년도별|시계열|trend/i.test(promptText) || looksLikeTimeSeries(xAxisKey, data);
+
+  return {
+    ...asset,
+    type: 'chart',
+    kind: 'chart',
+    chartType: /선|꺾은선|line/i.test(promptText) ? 'line' : 'bar',
+    xAxisKey,
+    chartType: shouldUseLine ? 'line' : 'bar',
+    series: numericKeys.slice(0, 6).map((key, index) => ({
+      dataKey: key,
+      name: key,
+      color: ['#94a3b8', '#64748b', '#0f172a', '#0ea5a4', '#2563eb', '#f59e0b'][index % 6],
+      yAxisId: 'left',
+    })),
+  };
 };
 
 function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null }) {
@@ -163,7 +296,7 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
   const [isComposingMessage, setIsComposingMessage] = useState(false);
   const [notice, setNotice] = useState('');
   const [imageDataUrls, setImageDataUrls] = useState({});
-  const [isLoadingProject, setIsLoadingProject] = useState(false);
+  const [selectedVisualAsset, setSelectedVisualAsset] = useState(null);
 
   // 로컬 프로젝트와 공유 프로젝트를 합쳐서 하나의 프로젝트 목록으로 만듭니다.
   // 공유본의 이미지를 항상 우선으로 반영합니다.
@@ -179,7 +312,12 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
       if (!project?.id) return;
       const localProject = mergedProjects.get(project.id) || {};
       // 다른 계정으로 접속했을 때도 이미지/코멘트가 최신 공유본 기준으로 보이도록 공유 저장소 데이터를 우선한다.
-      mergedProjects.set(project.id, { ...localProject, ...project });
+      mergedProjects.set(project.id, {
+        ...localProject,
+        ...project,
+        thread: asArray(localProject.thread).length > 0 ? localProject.thread : project.thread,
+        visuals: asArray(localProject.visuals).length > 0 ? localProject.visuals : project.visuals,
+      });
     });
 
     return Array.from(mergedProjects.values());
@@ -236,18 +374,13 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
   const collectProjectAssets = useCallback((project, sourceType = 'main') => {
     if (!project) return [];
 
-    const visuals = asArray(project.visuals).map((visual) => ({
-      id: visual.id,
-      type: 'visual',
-      kind: visual.kind || 'chart',
-      title: visual.title || '시각화 자료',
-      text: visual.desc || '분석 페이지에서 저장된 시각화 자료입니다.',
-      details: visual.details || [],
-      rows: visual.rows,
-      projectId: project.id,
-      projectTitle: project.title,
-      sourceType,
-    }));
+    const visualIdsFromThread = new Set();
+    const visualById = new Map(
+      asArray(project.visuals).flatMap((visual) => [
+        [visual.id, visual],
+        [normalizeVisualId(visual.id), visual],
+      ])
+    );
 
     const images = asArray(project.discussionImages).map((image) => ({
       ...image,
@@ -258,29 +391,86 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
       sourceType,
     }));
 
-    const resultItems = asArray(project.thread)
-      .filter((item) => item.role === 'asset' || item.rows)
-      .map((item) => ({
-        id: `thread-${item.id}`,
-        type: 'result',
-        title: item.title || '분석 결과',
-        text: item.text || '',
-        rows: item.rows,
+    let lastQuestionText = '';
+    const threadItems = asArray(project.thread)
+      .filter((item) => ['user', 'ai', 'asset'].includes(item.role) || item.rows)
+      .filter((item) => !(item.role === 'ai' && isIntroMessage(item.text)))
+      .map((item) => {
+        const promptText = lastQuestionText;
+        if (item.role === 'user') lastQuestionText = item.text || '';
+        const mergedItem = {
+          ...(visualById.get(item.id) || visualById.get(normalizeVisualId(item.id)) || {}),
+          ...item,
+        };
+        const rawType = mergedItem.type || mergedItem.kind;
+        const isVisual = ['chart', 'table', 'mindmap'].includes(rawType) || mergedItem.data || mergedItem.columns || mergedItem.series;
+        const nextAsset = {
+          ...mergedItem,
+          id: `thread-${item.id}`,
+          type: item.role === 'user'
+            ? 'question'
+            : item.role === 'ai'
+              ? 'answer'
+              : isVisual
+                ? 'visual'
+                : 'result',
+          kind: mergedItem.kind || mergedItem.type,
+          title: item.role === 'user' ? '질문' : mergedItem.title || (item.role === 'ai' ? 'AI 답변' : '분석 결과'),
+          text: mergedItem.text || '',
+          rows: mergedItem.rows,
+          projectId: project.id,
+          projectTitle: project.title,
+          sourceType,
+        };
+        return nextAsset.type === 'visual' ? coerceGraphAsset(nextAsset, promptText) : nextAsset;
+      })
+      .filter((item) => {
+        if (item.type === 'visual') {
+          visualIdsFromThread.add(normalizeVisualId(item.id));
+        }
+        return hasTimelineAssetContent(item);
+      });
+
+    const orphanVisuals = asArray(project.visuals)
+      .filter((visual) => !visualIdsFromThread.has(normalizeVisualId(visual.id)))
+      .map((visual) => ({
+        ...visual,
+        id: visual.id,
+        type: 'visual',
+        kind: visual.kind || visual.type || 'chart',
+        title: visual.title || '시각화 자료',
+        text: visual.desc || '분석 페이지에서 저장된 시각화 자료입니다.',
+        details: visual.details || [],
+        rows: visual.rows,
         projectId: project.id,
         projectTitle: project.title,
         sourceType,
       }));
 
-    return [...images, ...visuals, ...resultItems];
+    return [...threadItems, ...orphanVisuals, ...images].filter(hasTimelineAssetContent);
   }, [imageDataUrls]);
 
   const projectAssets = useMemo(() => {
     if (!activeProject) return [];
     return [
-      ...collectProjectAssets(activeProject, 'main'),
       ...supportProjects.flatMap((project) => collectProjectAssets(project, 'support')),
+      ...collectProjectAssets(activeProject, 'main'),
     ];
   }, [activeProject, collectProjectAssets, supportProjects]);
+
+  useEffect(() => {
+    if (!activeShareCode || !activeProject?.id) return;
+    const latestProject =
+      allProjects.find((project) => project.id === activeProject.id) ||
+      allProjects.find((project) => project.inviteCode === activeProject.inviteCode);
+    if (!latestProject) return;
+    if (JSON.stringify(latestProject.thread || []) === JSON.stringify(activeProject.thread || [])) return;
+    setRoom((prev) => ({
+      ...prev,
+      mainProjectId: latestProject.id,
+      loadedProjectIds: Array.from(new Set([...asArray(prev.loadedProjectIds), latestProject.id])),
+    }));
+  }, [activeProject?.id, activeProject?.inviteCode, activeProject?.thread, activeShareCode, allProjects]);
 
   const updateProjectEverywhere = (projectId, updater) => {
     const projectsKey = getProjectsKey();
@@ -323,72 +513,14 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
     return updatedProject;
   };
 
-  const rememberSharedProject = useCallback((project) => {
-    if (!project?.id) return null;
-
-    const sharedIndex = readJson(SHARED_PROJECTS_KEY, []);
-    const nextSharedProjects = upsertProjectByIdOrCode(sharedIndex, stripImageDataUrls(project));
-    writeJson(SHARED_PROJECTS_KEY, nextSharedProjects);
-    setSharedProjects(loadSharedProjects());
-    return project;
-  }, []);
-
-  const findProjectByInviteCode = useCallback(async (inviteCode) => {
-    const normalizedCode = normalizeInviteCode(inviteCode);
-    if (!normalizedCode) return null;
-
-    const localProject = allProjects.find((project) => project.inviteCode === normalizedCode);
-    if (localProject) return localProject;
-
-    try {
-      setIsLoadingProject(true);
-      const response = await projectAPI.findByInviteCode(normalizedCode);
-      const serverProject = response.data?.project;
-      if (!serverProject?.id) return null;
-      return rememberSharedProject(serverProject);
-    } catch (error) {
-      return null;
-    } finally {
-      setIsLoadingProject(false);
-    }
-  }, [allProjects, rememberSharedProject]);
-
-  const activateMainProject = useCallback((project, inviteCode, extraComments = []) => {
-    if (!project?.id) return;
-
-    const normalizedCode = normalizeInviteCode(inviteCode || project.inviteCode);
-    const sharedRoom = sanitizeRoom(readJson(getSharedRoomKey(normalizedCode), fallbackRoom));
-    const projectCommentIds = new Set(asArray(project.discussionComments).map((comment) => comment.id));
-    const mergedComments = [
-      ...asArray(project.discussionComments),
-      ...asArray(extraComments),
-      ...asArray(sharedRoom.comments).filter((comment) => !projectCommentIds.has(comment.id)),
-    ];
-    const nextIds = Array.from(new Set([...asArray(sharedRoom.loadedProjectIds), project.id]));
-    const alreadyJoined = asArray(sharedRoom.members).some((member) => member.name === username);
-
-    setActiveShareCode(normalizedCode);
-    setSelectedProjectId(project.id);
-    setRoom({
-      ...sharedRoom,
-      inviteCode: normalizedCode,
-      joinedCode: normalizedCode,
-      mainProjectId: project.id,
-      loadedProjectIds: nextIds,
-      comments: mergedComments,
-      members: alreadyJoined ? asArray(sharedRoom.members) : [...asArray(sharedRoom.members), { id: Date.now(), name: username }],
-    });
-    rememberSharedProject(project);
-  }, [rememberSharedProject, username]);
-
   // room 상태가 변경될 때 로컬 저장소에도 업데이트합니다.
   // 활성 초대코드가 있으면 공유 방과 일반 방 둘 다 동기화합니다.
   useEffect(() => {
     const roomKey = activeShareCode ? getSharedRoomKey(activeShareCode) : getShareRoomKey();
     const nextRoom = {
       ...room,
-      inviteCode: activeShareCode || room.inviteCode || '',
-      joinedCode: activeShareCode || room.joinedCode || '',
+      inviteCode: activeShareCode || room.inviteCode,
+      joinedCode: activeShareCode || room.joinedCode,
     };
     if (JSON.stringify(readJson(roomKey, null)) !== JSON.stringify(nextRoom)) {
       writeJson(roomKey, nextRoom);
@@ -505,22 +637,42 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
     };
   }, [imageDataUrls, projectAssets]);
 
-  const joinWithCode = async () => {
-    const normalizedCode = normalizeInviteCode(room.joinedCode);
-    const matchedProject = await findProjectByInviteCode(normalizedCode);
+  const joinWithCode = () => {
+    const normalizedCode = room.joinedCode.trim();
+    const matchedProject = allProjects.find((project) => project.inviteCode === normalizedCode);
 
     if (!matchedProject) {
-      setNotice('초대코드를 찾지 못했습니다. 프로젝트 카드의 초대코드를 다시 확인해주세요.');
+      setNotice('초대코드를 정확히 입력해야 프로젝트 토론방에 참여할 수 있습니다.');
       return;
     }
 
-    shouldScrollToAssetsRef.current = true;
-    activateMainProject(matchedProject, normalizedCode);
+    const sharedRoom = sanitizeRoom(readJson(getSharedRoomKey(normalizedCode), fallbackRoom));
+    const projectCommentIds = new Set(asArray(matchedProject.discussionComments).map((comment) => comment.id));
+    const mergedComments = [
+      ...asArray(matchedProject.discussionComments),
+      ...asArray(sharedRoom.comments).filter((comment) => !projectCommentIds.has(comment.id)),
+    ];
+    const nextIds = sharedRoom.loadedProjectIds.includes(matchedProject.id)
+      ? sharedRoom.loadedProjectIds
+      : [...sharedRoom.loadedProjectIds, matchedProject.id];
+    const alreadyJoined = asArray(sharedRoom.members).some((member) => member.name === username);
+
+    setActiveShareCode(normalizedCode);
+    setSelectedProjectId(matchedProject.id);
+    setRoom({
+      ...sharedRoom,
+      inviteCode: normalizedCode,
+      joinedCode: normalizedCode,
+      mainProjectId: matchedProject.id,
+      loadedProjectIds: nextIds,
+      comments: mergedComments,
+      members: alreadyJoined ? asArray(sharedRoom.members) : [...asArray(sharedRoom.members), { id: Date.now(), name: username }],
+    });
     setNotice(`참여 완료: "${matchedProject.title}" 결과 토론방을 불러왔습니다.`);
   };
 
-  const loadSupportProjectByCode = async () => {
-    const normalizedCode = normalizeInviteCode(supportInviteCode);
+  const loadSupportProjectByCode = () => {
+    const normalizedCode = supportInviteCode.trim();
     if (!normalizedCode) {
       setNotice('비교할 보조 프로젝트의 초대코드를 입력해주세요.');
       return;
@@ -531,7 +683,7 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
       return;
     }
 
-    const supportProject = await findProjectByInviteCode(normalizedCode);
+    const supportProject = allProjects.find((project) => project.inviteCode === normalizedCode);
     if (!supportProject) {
       setNotice('보조 프로젝트 초대코드를 찾을 수 없습니다.');
       return;
@@ -542,7 +694,7 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
       return;
     }
 
-    shouldScrollToAssetsRef.current = true;
+    shouldScrollToAssetsRef.current = false;
     setRoom((prev) => ({
       ...prev,
       mainProjectId: activeProject.id,
@@ -680,6 +832,7 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
       ])
     );
     const savedAssets = projectAssets.map((asset) => ({
+      ...asset,
       id: `saved-${asset.id}`,
       role: 'asset',
       title: asset.title,
@@ -725,27 +878,40 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
         projectTitle: title.trim(),
       })),
       thread: [
-        {
-          id: `user-${projectId}`,
-          role: 'user',
-          text: `${activeProject.title}${supportTitles ? ` / ${supportTitles}` : ''} 공유 분석 저장`,
-        },
-        {
-          id: `ai-${projectId}`,
-          role: 'ai',
-          text: `공유 토론방에서 저장한 분석 카드입니다. 자료 ${projectAssets.length}개와 코멘트 ${projectComments.length}개를 포함합니다.`,
-        },
+        ...(asArray(activeProject.thread).length
+          ? asArray(activeProject.thread)
+          : [
+              {
+                id: `user-${projectId}`,
+                role: 'user',
+                text: `${activeProject.title}${supportTitles ? ` / ${supportTitles}` : ''} 공유 분석 저장`,
+              },
+              {
+                id: `ai-${projectId}`,
+                role: 'ai',
+                text: `공유 토론방에서 저장한 분석 카드입니다. 자료 ${projectAssets.length}개와 코멘트 ${projectComments.length}개를 포함합니다.`,
+              },
+            ]),
+        ...supportProjects.flatMap((project) => asArray(project.thread)),
         ...savedAssets,
       ],
       visuals: projectAssets
         .filter((asset) => asset.type === 'visual')
         .map((asset) => ({
+          ...asset,
           id: `visual-${asset.id}`,
           kind: asset.kind,
+          type: asset.kind || asset.type,
           title: asset.title,
           desc: asset.text,
           details: asset.details,
           rows: asset.rows,
+          columns: asset.columns,
+          series: asset.series,
+          data: asset.data,
+          chartType: asset.chartType,
+          xAxisKey: asset.xAxisKey,
+          theme: asset.theme,
           date: today,
           projectId,
           projectTitle: title.trim(),
@@ -796,12 +962,14 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
 
     const recentConversationsKey = getRecentConversationsKey();
     const savedRecents = readJson(recentConversationsKey, []);
+    const lastUserMessage = [...asArray(storableSharedProject.thread)].reverse().find((item) => item.role === 'user');
     writeJson(recentConversationsKey, [
       {
         id: projectId,
         projectId,
         title: storableSharedProject.title,
-        question: storableSharedProject.thread[0].text,
+        question: lastUserMessage?.text || storableSharedProject.title,
+        thread: storableSharedProject.thread,
         inviteCode,
         createdAt: storableSharedProject.createdAt,
       },
@@ -814,6 +982,9 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
   };
 
   const renderVisualPreview = (asset) => {
+    if (asset.data || asset.columns || asset.series || ['chart', 'table', 'mindmap'].includes(asset.kind || asset.type)) {
+      return <DynamicVisualizer config={asset} fallbackTitle={asset.title} />;
+    }
     if (asset.kind === 'table') {
       return (
         <div className="mini-visual table">
@@ -837,6 +1008,28 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
         <span style={{ height: '48%' }}></span>
         <span style={{ height: '82%' }}></span>
       </div>
+    );
+  };
+
+  const renderCompactAnswer = (text = '') => {
+    const { main, evidence } = splitEvidenceSections(text);
+    return (
+      <>
+        {main && <div className="body">{main}</div>}
+        {evidence.length > 0 && (
+          <div className="answer-evidence-panel">
+            {evidence.map((section) => (
+              <details className="answer-evidence-section" key={section.title}>
+                <summary>
+                  <span>{section.title}</span>
+                  <b>열어서 보기</b>
+                </summary>
+                <div className="answer-evidence-content">{section.body}</div>
+              </details>
+            ))}
+          </div>
+        )}
+      </>
     );
   };
 
@@ -889,13 +1082,11 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
                 value={supportInviteCode}
                 placeholder="비교 프로젝트 초대코드"
                 onChange={(event) => setSupportInviteCode(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') void loadSupportProjectByCode();
-                }}
+                onKeyDown={(event) => event.key === 'Enter' && loadSupportProjectByCode()}
               />
-              <button type="button" className="support-load-btn" onClick={() => void loadSupportProjectByCode()} disabled={isLoadingProject}>
+              <button type="button" className="support-load-btn" onClick={loadSupportProjectByCode}>
                 <i className="fa-regular fa-folder-open"></i>
-                {isLoadingProject ? '불러오는 중...' : '프로젝트 카드 불러오기'}
+                프로젝트 카드 불러오기
               </button>
             </div>
             <span className="hint">메인 토론방에 보조 프로젝트를 붙여 비교합니다.</span>
@@ -938,13 +1129,32 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
                     {asset.sourceType === 'support' ? '비교 프로젝트' : '메인 프로젝트'} · {asset.projectTitle}
                   </div>
                   <h4>{asset.title}</h4>
+                  {asset.type === 'question' && (
+                    <div className="question-card">{asset.text}</div>
+                  )}
                   {asset.type === 'image' && (
                     <img className="discussion-image" src={asset.dataUrl} alt={asset.title} />
                   )}
                   {asset.type === 'visual' && (
-                    <div className="visual-preview">{renderVisualPreview(asset)}</div>
+                    <button
+                      type="button"
+                      className="visual-preview visual-preview-button"
+                      onClick={() => setSelectedVisualAsset(asset)}
+                      aria-label={`${asset.title} 크게 보기`}
+                    >
+                      {renderVisualPreview(asset)}
+                    </button>
                   )}
-                  {asset.text && <div className="body">{asset.text}</div>}
+                  {asset.type === 'answer' && asset.text && (
+                    <details className="answer-fold">
+                      <summary>
+                        <span>{splitEvidenceSections(asset.text).main.replace(/\s+/g, ' ').slice(0, 120)}{splitEvidenceSections(asset.text).main.length > 120 ? '...' : ''}</span>
+                        <b>열어서 보기</b>
+                      </summary>
+                      {renderCompactAnswer(asset.text)}
+                    </details>
+                  )}
+                  {asset.text && !['question', 'visual', 'answer'].includes(asset.type) && <div className="body">{asset.text}</div>}
                   {Array.isArray(asset.details) && asset.details.length > 0 && (
                     <div className="detail-list">
                       {asset.details.map((item, itemIndex) => (
@@ -955,7 +1165,7 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
                       ))}
                     </div>
                   )}
-                  {renderAssetTable(asset.rows)}
+                  {asset.type !== 'visual' && renderAssetTable(asset.rows)}
                   {asset.uploadedBy && <div className="meta">{asset.uploadedBy} · {asset.time}</div>}
                 </div>
               </TimelineNode>
@@ -973,12 +1183,10 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
             value={room.joinedCode}
             placeholder={activeInviteCode || '프로젝트 초대코드'}
             onChange={(event) => setRoom((prev) => ({ ...prev, joinedCode: event.target.value }))}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') void joinWithCode();
-            }}
+            onKeyDown={(event) => event.key === 'Enter' && joinWithCode()}
           />
-          <button className="join-action" type="button" onClick={() => void joinWithCode()} disabled={isLoadingProject}>
-            {isLoadingProject ? '확인 중' : '입력'}
+          <button className="join-action" type="button" onClick={joinWithCode}>
+            입력
           </button>
         </div>
         <div className="notice">{notice}</div>
@@ -1048,6 +1256,23 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
           </button>
         </FooterInputBox>
       </RightCoopPanel>
+
+      {selectedVisualAsset && (
+        <VisualModalOverlay onClick={() => setSelectedVisualAsset(null)}>
+          <VisualModalPanel onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <span>{selectedVisualAsset.projectTitle || '공유 프로젝트'}</span>
+                <h3>{selectedVisualAsset.title || '시각화 자료'}</h3>
+              </div>
+              <button type="button" onClick={() => setSelectedVisualAsset(null)} aria-label="닫기">×</button>
+            </div>
+            <div className="modal-body">
+              <DynamicVisualizer config={selectedVisualAsset} fallbackTitle={selectedVisualAsset.title} />
+            </div>
+          </VisualModalPanel>
+        </VisualModalOverlay>
+      )}
     </Container>
   );
 }

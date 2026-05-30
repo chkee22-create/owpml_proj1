@@ -8,6 +8,7 @@ interface AnalysisChatOptions {
   provider?: string;
   openaiApiKey?: string;
   googleApiKey?: string;
+  conversationId?: string;
 }
 
 const isBrowserFile = (file: unknown): file is File =>
@@ -90,13 +91,26 @@ export const analysisAPI = {
   chat: (question: string, files: File[], options: AnalysisChatOptions = {}, analysisText = '') => {
     const formData = new FormData();
     formData.append('question', question);
-    formData.append('llm_provider', options.provider || 'openai');
+    if (options.conversationId) formData.append('conversation_id', options.conversationId);
+    formData.append('llm_provider', options.provider || 'google');
     if (options.openaiApiKey) formData.append('openai_api_key', options.openaiApiKey);
     if (options.googleApiKey) formData.append('google_api_key', options.googleApiKey);
     if (analysisText) formData.append('analysis_text', analysisText);
     files.filter(isBrowserFile).forEach((file) => formData.append('files', file, file.name));
 
     return apiClient.post('/api/analysis/chat', formData);
+  },
+  generateChatTitle: (question: string, options: AnalysisChatOptions = {}, analysisText = '') => {
+    const formData = new FormData();
+    formData.append('question', question);
+    formData.append('llm_provider', options.provider || 'google');
+    if (options.openaiApiKey) formData.append('openai_api_key', options.openaiApiKey);
+    if (options.googleApiKey) formData.append('google_api_key', options.googleApiKey);
+    if (analysisText) formData.append('analysis_text', analysisText);
+
+    return apiClient.post('/api/analysis/title', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
   },
   createVisual: (type: string, files: File[], analysisText = '') => {
     const formData = new FormData();

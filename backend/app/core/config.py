@@ -89,6 +89,11 @@ class Settings:
     max_upload_files: int
 
     hwpx_jar: str
+    hwp_jar: str
+    hwpx_loader: str
+    hwp_loader: str
+    java_bin: str
+    hwp_parser_timeout_seconds: int
     openai_api_key: str
     openai_model: str
     google_api_key: str
@@ -112,6 +117,8 @@ class Settings:
             raise RuntimeError("MAX_UPLOAD_MB는 1 이상이어야 합니다.")
         if self.max_upload_files <= 0:
             raise RuntimeError("MAX_UPLOAD_FILES는 1 이상이어야 합니다.")
+        if self.hwp_parser_timeout_seconds <= 0:
+            raise RuntimeError("HWP_PARSER_TIMEOUT_SECONDS는 1 이상이어야 합니다.")
 
 
 def create_settings() -> Settings:
@@ -131,6 +138,11 @@ def create_settings() -> Settings:
         max_upload_mb=_env_int("MAX_UPLOAD_MB", 25),
         max_upload_files=_env_int("MAX_UPLOAD_FILES", 10),
         hwpx_jar=os.getenv("HWPX_JAR", "").strip(),
+        hwp_jar=os.getenv("HWP_JAR", "").strip(),
+        hwpx_loader=os.getenv("HWPX_LOADER", "").strip(),
+        hwp_loader=os.getenv("HWP_LOADER", "").strip(),
+        java_bin=os.getenv("JAVA_BIN", "java").strip() or "java",
+        hwp_parser_timeout_seconds=_env_int("HWP_PARSER_TIMEOUT_SECONDS", 30),
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip(),
         google_api_key=os.getenv("GOOGLE_API_KEY", "").strip(),
