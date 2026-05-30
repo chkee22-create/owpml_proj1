@@ -58,6 +58,235 @@ const renderDetailedVisualPreview = (asset: any) => {
   return <DynamicVisualizer config={asset} fallbackTitle={asset.title} />;
 };
 
+const makeSafeFilename = (name = 'papermate-report') =>
+  String(name)
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .replace(/\s+/g, '_')
+    .slice(0, 80) || 'papermate-report';
+
+const downloadBlob = (content, filename, type) => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+const escapeCsvCell = (value) => {
+  const text = value == null ? '' : String(value);
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+const getVisualColumns = (visual, rows) =>
+  Array.isArray(visual?.columns) && visual.columns.length > 0
+    ? visual.columns.map((column) => ({
+        key: column.key,
+        label: column.label || column.key,
+      }))
+    : Array.from(new Set(rows.flatMap((row) => Object.keys(row || {})))).map((key) => ({ key, label: key }));
+
+const getVisualDownloadRows = (visual) => {
+  if (Array.isArray(visual?.data) && visual.data.length > 0) return visual.data;
+  if (Array.isArray(visual?.rows) && visual.rows.length > 0) return visual.rows;
+  if (Array.isArray(visual?.details) && visual.details.length > 0) {
+    return visual.details.map((item) => ({
+      label: item.lbl || item.label || item.name || '',
+      value: item.val || item.value || item.point || '',
+    }));
+  }
+  return [];
+};
+
+const wrapCanvasText = (ctx, text, x, y, maxWidth, lineHeight) => {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  let line = '';
+  let cursorY = y;
+
+  words.forEach((word) => {
+    const nextLine = line ? `${line} ${word}` : word;
+    if (ctx.measureText(nextLine).width > maxWidth && line) {
+      ctx.fillText(line, x, cursorY);
+      line = word;
+      cursorY += lineHeight;
+    } else {
+      line = nextLine;
+    }
+  });
+
+  if (line) {
+    ctx.fillText(line, x, cursorY);
+    cursorY += lineHeight;
+  }
+
+  return cursorY;
+};
+
+const downloadVisualReportPng = (visual) => {
+  if (!visual) return;
+
+  const rows = getVisualDownloadRows(visual);
+  const columns = getVisualColumns(visual, rows);
+  const detailRows = asArray(visual.details).map((item) => [
+    item.lbl || item.label || item.name || '세부 정보',
+    item.val || item.value || item.point || '',
+  ]);
+  const width = 1400;
+  const rowHeight = 44;
+  const tableRows = Math.max(1, Math.min(rows.length, 12));
+  const height = Math.max(900, 520 + detailRows.length * 34 + tableRows * rowHeight);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const left = 70;
+  const contentWidth = width - left * 2;
+  ctx.fillStyle = '#f8fafc';
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(44, 44, width - 88, height - 88);
+  ctx.strokeStyle = '#dbe4ef';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(44, 44, width - 88, height - 88);
+
+  let y = 96;
+  ctx.fillStyle = '#0f172a';
+  ctx.font = '700 34px Arial, sans-serif';
+  y = wrapCanvasText(ctx, visual.title || 'PaperMate 시각화 보고서', left, y, contentWidth, 42) + 12;
+
+  ctx.fillStyle = '#0f766e';
+  ctx.font = '700 18px Arial, sans-serif';
+  ctx.fillText(`종류: ${visual.kind || visual.type || '-'}   차트 유형: ${visual.chartType || '-'}   저장 일자: ${visual.date || '-'}`, left, y);
+  y += 48;
+
+  ctx.fillStyle = '#334155';
+  ctx.font = '700 22px Arial, sans-serif';
+  ctx.fillText('데이터 분석 요약', left, y);
+  y += 34;
+  ctx.font = '500 20px Arial, sans-serif';
+  ctx.fillStyle = '#475569';
+  y = wrapCanvasText(ctx, visual.desc || visual.text || '저장된 분석 요약이 없습니다.', left, y, contentWidth, 30) + 24;
+
+  if (detailRows.length > 0) {
+    ctx.fillStyle = '#334155';
+    ctx.font = '700 22px Arial, sans-serif';
+    ctx.fillText('세부 정보 필드', left, y);
+    y += 28;
+    ctx.font = '500 18px Arial, sans-serif';
+    detailRows.forEach(([label, value]) => {
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(String(label), left, y);
+      ctx.fillStyle = '#1e293b';
+      ctx.fillText(String(value), left + 260, y);
+      y += 30;
+    });
+    y += 16;
+  }
+
+  ctx.fillStyle = '#334155';
+  ctx.font = '700 22px Arial, sans-serif';
+  ctx.fillText('보고서 데이터', left, y);
+  y += 22;
+
+  if (rows.length > 0 && columns.length > 0) {
+    const colWidth = contentWidth / columns.length;
+    ctx.font = '700 16px Arial, sans-serif';
+    columns.forEach((column, index) => {
+      ctx.fillStyle = '#0f766e';
+      ctx.fillRect(left + index * colWidth, y, colWidth, rowHeight);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(String(column.label), left + index * colWidth + 12, y + 28);
+    });
+    y += rowHeight;
+
+    ctx.font = '500 15px Arial, sans-serif';
+    rows.slice(0, 12).forEach((row, rowIndex) => {
+      columns.forEach((column, index) => {
+        ctx.fillStyle = rowIndex % 2 === 0 ? '#ffffff' : '#f8fafc';
+        ctx.fillRect(left + index * colWidth, y, colWidth, rowHeight);
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.strokeRect(left + index * colWidth, y, colWidth, rowHeight);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillText(String(row?.[column.key] ?? '-').slice(0, 26), left + index * colWidth + 12, y + 28);
+      });
+      y += rowHeight;
+    });
+
+    if (rows.length > 12) {
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 16px Arial, sans-serif';
+      ctx.fillText(`외 ${rows.length - 12}개 행은 CSV 데이터 다운로드에서 확인할 수 있습니다.`, left, y + 28);
+    }
+  } else {
+    ctx.fillStyle = '#64748b';
+    ctx.font = '500 18px Arial, sans-serif';
+    ctx.fillText('저장된 표/그래프 행 데이터가 없습니다.', left, y + 28);
+  }
+
+  const baseName = makeSafeFilename(visual.title || visual.kind || 'visual-report');
+  const link = document.createElement('a');
+  link.download = `${baseName}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+};
+
+const downloadVisualReportData = (visual) => {
+  if (!visual) return;
+
+  const rows = getVisualDownloadRows(visual);
+  const baseName = makeSafeFilename(visual.title || visual.kind || 'visual-report');
+
+  if (rows.length > 0) {
+    const columns = Array.isArray(visual.columns) && visual.columns.length > 0
+      ? visual.columns.map((column) => ({
+          key: column.key,
+          label: column.label || column.key,
+        }))
+      : Array.from(new Set(rows.flatMap((row) => Object.keys(row || {})))).map((key) => ({ key, label: key }));
+
+    const detailRows = asArray(visual.details).map((item) => [
+      item.lbl || item.label || item.name || '세부 정보',
+      item.val || item.value || item.point || '',
+    ]);
+    const metadataRows = [
+      ['제목', visual.title || ''],
+      ['종류', visual.kind || visual.type || ''],
+      ['차트 유형', visual.chartType || ''],
+      ['저장 일자', visual.date || ''],
+      ['데이터 분석 요약', visual.desc || visual.text || ''],
+      ...detailRows,
+    ];
+    const csv = [
+      ['보고서 정보', '내용'].map(escapeCsvCell).join(','),
+      ...metadataRows.map((row) => row.map(escapeCsvCell).join(',')),
+      '',
+      columns.map((column) => escapeCsvCell(column.label)).join(','),
+      ...rows.map((row) => columns.map((column) => escapeCsvCell(row?.[column.key])).join(',')),
+    ].join('\n');
+    downloadBlob(`\uFEFF${csv}`, `${baseName}.csv`, 'text/csv;charset=utf-8');
+    return;
+  }
+
+  const json = JSON.stringify(
+    {
+      title: visual.title,
+      kind: visual.kind || visual.type,
+      chartType: visual.chartType,
+      description: visual.desc || visual.text,
+      savedAt: visual.date,
+      visual,
+    },
+    null,
+    2
+  );
+  downloadBlob(json, `${baseName}.json`, 'application/json;charset=utf-8');
+};
+
 const legacyDummyProjectTitles = [
   '이미지 분류',
   '자연어 처리',
@@ -562,7 +791,12 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
               </div>
             </div>
             <div className="drawer-footer">
-              <button type="button" className="action-btn">보고서 데이터 다운로드 (PNG)</button>
+              <button type="button" className="action-btn" onClick={() => downloadVisualReportData(selectedVisual)}>
+                보고서 데이터 다운로드
+              </button>
+              <button type="button" className="action-btn" onClick={() => downloadVisualReportPng(selectedVisual)}>
+                PNG로 다운로드
+              </button>
             </div>
           </>
         )}

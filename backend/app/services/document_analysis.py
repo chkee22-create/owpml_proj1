@@ -32,6 +32,15 @@ IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 CHUNK_SIZE = 900
 CHUNK_OVERLAP = 160
 MAX_SPACING_CHARS = 3000
+EXTRACTION_NOISE_PATTERN = re.compile(r"[\u0100-\u024f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]+")
+IMAGE_META_PATTERNS = (
+    re.compile(r"원본\s*그림의\s*이름\s*:\s*CLP[^\s]+", re.IGNORECASE),
+    re.compile(r"원본\s*그림의\s*크기\s*:\s*가로\s*\d+\s*pixel\s*,?\s*세로\s*\d+\s*pixel", re.IGNORECASE),
+)
+FORMULA_NOISE_PATTERN = re.compile(
+    r"\{[^{}]{0,100}(?:TIMES|over)[^{}]{0,220}\}|(?:TIMES|over)\s*`?\s*1,?0{2,}",
+    re.IGNORECASE,
+)
 
 # WikiDocs의 한국어 QA 예제는 사용자 사전을 추가한 형태소 분석으로
 # 사람 이름/전문용어가 잘게 쪼개지는 문제를 줄이는 아이디어를 소개합니다.
@@ -111,6 +120,14 @@ KOREAN_SUFFIXES = (
 # 공백과 HTML 엔티티를 정리해 분석하기 쉬운 한 줄 텍스트로 만듭니다.
 def _clean_text(text: str) -> str:
     text = unescape(text or "")
+    text = EXTRACTION_NOISE_PATTERN.sub(" ", text)
+    for pattern in IMAGE_META_PATTERNS:
+        text = pattern.sub(" ", text)
+    text = re.sub(r"\{[^\n]{0,260}(?:TIMES|over)[^\n]{0,260}\}", " ", text, flags=re.IGNORECASE)
+    text = FORMULA_NOISE_PATTERN.sub(" ", text)
+    text = re.sub(r"(?:\{[^{}]{0,80}\}\s*){2,}", " ", text)
+    text = re.sub(r"\b(?:TIMES|over)\b", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"수식입니다", " ", text)
     # 제어문자 제거
     text = re.sub(r"[\x00-\x1f\x7f]+", " ", text)
 
@@ -213,6 +230,8 @@ def _regex_terms(text: str) -> list[str]:
     terms = []
     for word in re.findall(r"[A-Za-z가-힣0-9]{2,}", text.lower()):
         normalized = _strip_korean_suffix(word)
+        if normalized.isdigit() or re.fullmatch(r"\d+(?:월|년|분기|일)", normalized):
+            continue
         if len(normalized) >= 2:
             terms.append(normalized)
     return terms
@@ -394,6 +413,19 @@ def _idf_weights(chunks: list[str]) -> dict[str, float]:
     }
 
 
+def _compact_for_match(text: str) -> str:
+    return re.sub(r"\s+", "", text or "").lower()
+
+
+def _query_terms_for_rank(question: str) -> list[str]:
+    terms = []
+    for term in re.findall(r"[A-Za-z가-힣0-9]{2,}", (question or "").lower()):
+        if term.isdigit() or re.fullmatch(r"\d+(?:월|년|분기|일)", term):
+            continue
+        terms.append(term)
+    return terms
+
+
 def rank_relevant_chunks(question: str, extracted_docs: list[dict], limit: int = 6) -> list[dict]:
     """질문과 가까운 문서 조각을 TF-IDF식 점수로 고릅니다.
 
@@ -402,20 +434,52 @@ def rank_relevant_chunks(question: str, extracted_docs: list[dict], limit: int =
 
     candidates: list[dict] = []
     for doc in extracted_docs:
-        for index, chunk in enumerate(_chunk_text(doc.get("text", "")), start=1):
-            candidates.append(
-                {
-                    "filename": doc.get("filename", "unknown"),
-                    "format": doc.get("format", "unknown"),
-                    "chunk_index": index,
-                    "text": chunk,
-                }
-            )
+        source_units = doc.get("source_units") or [
+            {
+                "source_label": doc.get("source_label") or doc.get("format", "document"),
+                "page_number": doc.get("page_number"),
+                "section_index": doc.get("section_index"),
+                "text": doc.get("text", ""),
+            }
+        ]
+        chunk_index = 1
+        for unit in source_units:
+            for chunk in _chunk_text(unit.get("text", "")):
+                candidates.append(
+                    {
+                        "filename": doc.get("filename", "unknown"),
+                        "format": doc.get("format", "unknown"),
+                        "chunk_index": chunk_index,
+                        "source_label": unit.get("source_label") or doc.get("format", "document"),
+                        "page_number": unit.get("page_number"),
+                        "section_index": unit.get("section_index"),
+                        "text": chunk,
+                    }
+                )
+                chunk_index += 1
 
     if not candidates:
         return []
 
     query_terms = set(_tokenize_terms(question or " ".join(_frequent_terms(" ".join(item["text"] for item in candidates), 8))))
+    compact_question = _compact_for_match(question)
+    rank_terms = _query_terms_for_rank(question)
+    important_phrases = (
+        "시도별혼인건수",
+        "시도별이혼건수",
+        "시도별사망자수",
+        "시도별출생아수",
+        "시도별조혼인율",
+        "시도별조이혼율",
+        "시도별합계출산율",
+        "혼인종류별혼인건수",
+        "혼인건수",
+        "이혼건수",
+        "사망자수",
+        "출생아수",
+        "자연증가",
+        "합계출산율",
+    )
     idf = _idf_weights([item["text"] for item in candidates])
 
     ranked = []
@@ -435,6 +499,13 @@ def rank_relevant_chunks(question: str, extracted_docs: list[dict], limit: int =
         # 질문어가 적거나 일치가 거의 없을 때도 연구 핵심 문장 청크가 올라오게 보정합니다.
         score += sum(min(idf.get(term, 1), 3) for term in _frequent_terms(item["text"], 4)) * 0.15
         score += len(_metric_candidates(item["text"], 2)) * 1.4
+        compact_text = _compact_for_match(item["text"])
+        for phrase in important_phrases:
+            if phrase in compact_question and phrase in compact_text:
+                score += 25
+        score += sum(1.2 for term in rank_terms if term in compact_text)
+        if "원본그림" in compact_text or "수식입니다" in item["text"]:
+            score -= 8
 
         ranked.append({**item, "score": round(score, 4)})
 
@@ -651,6 +722,46 @@ def _finalize_extracted_text(text: str) -> str:
     return preprocess_korean_text(text, fix_spacing=False)
 
 
+def _source_label(file_format: str, number: int | None = None) -> str:
+    if file_format == "PDF" and number:
+        return f"Page {number}"
+    if file_format in {"HWP", "HWPX/OWPML", "DOCX"} and number:
+        return f"Section {number}"
+    return file_format or "document"
+
+
+def _finalize_source_units(units: list[dict], file_format: str) -> list[dict]:
+    finalized = []
+    for index, unit in enumerate(units, start=1):
+        text = _finalize_extracted_text(unit.get("text", ""))
+        if not text.strip():
+            continue
+        page_number = unit.get("page_number")
+        section_index = unit.get("section_index")
+        number = page_number or section_index or index
+        finalized.append(
+            {
+                **unit,
+                "text": text,
+                "source_label": unit.get("source_label") or _source_label(file_format, number),
+            }
+        )
+    return finalized
+
+
+def _document_from_units(filename: str, file_format: str, units: list[dict]) -> dict:
+    finalized_units = _finalize_source_units(units, file_format)
+    text = "\n\n".join(
+        f"[{unit['source_label']}]\n{unit['text']}" for unit in finalized_units
+    )
+    return {
+        "filename": filename,
+        "format": file_format,
+        "text": text,
+        "source_units": finalized_units,
+    }
+
+
 def _question_intent(question: str) -> str:
     lowered = (question or "").lower()
     if any(word in lowered for word in ["중요", "핵심", "요약", "summary", "main"]):
@@ -678,6 +789,10 @@ def _doc_brief(doc: dict) -> dict:
 # PDF 분석은 PyMuPDF의 fitz.open(stream=..., filetype="pdf")를 사용합니다.
 # 각 페이지의 텍스트를 page.get_text("text")로 꺼내 이어 붙입니다.
 def extract_pdf(content: bytes) -> str:
+    return "\n".join(unit["text"] for unit in extract_pdf_units(content))
+
+
+def extract_pdf_units(content: bytes) -> list[dict]:
     try:
         import fitz
     except ModuleNotFoundError:
@@ -692,6 +807,33 @@ def extract_pdf(content: bytes) -> str:
             elif page_text is not None:
                 texts.append(str(page_text))
         return "\n".join(texts)
+
+
+def extract_pdf_units(content: bytes) -> list[dict]:
+    try:
+        import fitz
+    except ModuleNotFoundError:
+        return [
+            {
+                "page_number": 1,
+                "source_label": "Page 1",
+                "text": "PDF 분석을 위해 PyMuPDF 패키지가 필요합니다. requirements.txt 설치 후 다시 시도해주세요.",
+            }
+        ]
+
+    with fitz.open(stream=content, filetype="pdf") as document:
+        units: list[dict] = []
+        for page_index, page in enumerate(document, start=1):
+            page_text = page.get_text("text")
+            if isinstance(page_text, str):
+                text = page_text
+            elif page_text is not None:
+                text = str(page_text)
+            else:
+                text = ""
+            if text.strip():
+                units.append({"page_number": page_index, "source_label": f"Page {page_index}", "text": text})
+        return units
 
 
 # TXT/CSV/MD 파일은 인코딩을 순서대로 시도합니다.
@@ -817,7 +959,38 @@ def inspect_image(content: bytes) -> str:
 
 
 # 확장자를 보고 어떤 추출기를 사용할지 결정하는 입구 함수입니다.
+def extract_file_document(filename: str, content: bytes) -> dict:
+    extension = Path(filename).suffix.lower()
+    if extension == ".pdf":
+        return _document_from_units(filename, "PDF", extract_pdf_units(content))
+    if extension == ".hwpx":
+        parsed = parse_document(content, filename)
+        text = _parsed_text_or_message(
+            parsed,
+            "HWPX/OWPML 내부에서 추출 가능한 본문 텍스트를 찾지 못했습니다.",
+        )
+        return _document_from_units(filename, "HWPX/OWPML", [{"section_index": 1, "text": text}])
+    if extension == ".docx":
+        return _document_from_units(filename, "DOCX", [{"section_index": 1, "text": extract_docx(content)}])
+    if extension in TEXT_EXTENSIONS:
+        return _document_from_units(filename, "TEXT", [{"section_index": 1, "text": extract_text(content)}])
+    if extension in IMAGE_EXTENSIONS:
+        return _document_from_units(filename, "IMAGE", [{"section_index": 1, "text": inspect_image(content)}])
+    if extension == ".hwp":
+        parsed = parse_document(content, filename)
+        text = _parsed_text_or_message(parsed, "")
+        if not text:
+            text = extract_hwp(content)
+        return _document_from_units(filename, "HWP", [{"section_index": 1, "text": text}])
+    return _document_from_units(filename, "UNKNOWN", [{"section_index": 1, "text": "지원하지 않는 파일 형식입니다."}])
+
+
 def extract_file_text(filename: str, content: bytes) -> tuple[str, str]:
+    document = extract_file_document(filename, content)
+    return document.get("text", ""), document.get("format", "UNKNOWN")
+
+
+def _legacy_extract_file_text(filename: str, content: bytes) -> tuple[str, str]:
     extension = Path(filename).suffix.lower()
     if extension == ".pdf":
         return _finalize_extracted_text(extract_pdf(content)), "PDF"
@@ -908,8 +1081,9 @@ def build_analysis_answer(question: str, extracted_docs: list[dict]) -> dict:
         ])
         for chunk in relevant_chunks[:4]:
             preview = _clean_text(chunk["text"])[:260]
+            source_label = chunk.get("source_label") or f"Chunk {chunk['chunk_index']}"
             answer_lines.append(
-                f"- {chunk['filename']} #{chunk['chunk_index']} "
+                f"- {chunk['filename']} {source_label} "
                 f"(관련도 {chunk['score']}): {preview}"
             )
 

@@ -447,6 +447,79 @@ export const AiRow = styled.div`
     tr:nth-child(even) {
       background-color: #f8fafc;
     }
+
+    .evidence-panel {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .evidence-section {
+      border: 1px solid #8deee1;
+      border-radius: 8px;
+      background: #c9fbf1;
+      overflow: hidden;
+      box-shadow: none;
+    }
+
+    .evidence-section summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 50px;
+      padding: 8px 16px;
+      color: #00746f;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 900;
+      list-style: none;
+      background: #c9fbf1;
+    }
+
+    .evidence-section summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .evidence-section summary::after {
+      content: "∨";
+      color: #00746f;
+      font-size: 16px;
+      font-weight: 900;
+      transition: transform 0.18s ease;
+    }
+
+    .evidence-section[open] summary::after {
+      transform: rotate(180deg);
+    }
+
+    .evidence-section summary small {
+      margin-left: auto;
+      background: #ffffff;
+      border: 1px solid #55ddcf;
+      border-radius: 999px;
+      color: #00746f;
+      font-size: 13px;
+      font-weight: 800;
+      padding: 6px 14px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .evidence-content {
+      border-top: 1px solid #8deee1;
+      background: #ffffff;
+      padding: 14px 18px;
+      color: #334155;
+      font-size: 13.5px;
+      line-height: 1.65;
+    }
+
+    .evidence-content p,
+    .evidence-content ul,
+    .evidence-content ol {
+      margin-bottom: 10px;
+    }
   }
 
   /* 추천 질문 칩 영역 */

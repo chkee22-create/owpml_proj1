@@ -8,6 +8,7 @@ interface AnalysisChatOptions {
   provider?: string;
   openaiApiKey?: string;
   googleApiKey?: string;
+  conversationId?: string;
 }
 
 const getApiBaseUrl = () => {
@@ -48,12 +49,6 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('isLoggedIn');
-      localStorage.removeItem('username');
-      window.location.reload();
-    }
     return Promise.reject(error);
   }
 );
@@ -83,7 +78,8 @@ export const analysisAPI = {
   chat: (question: string, files: File[], options: AnalysisChatOptions = {}, analysisText = '') => {
     const formData = new FormData();
     formData.append('question', question);
-    formData.append('llm_provider', options.provider || 'openai');
+    if (options.conversationId) formData.append('conversation_id', options.conversationId);
+    formData.append('llm_provider', options.provider || 'google');
     if (options.openaiApiKey) formData.append('openai_api_key', options.openaiApiKey);
     if (options.googleApiKey) formData.append('google_api_key', options.googleApiKey);
     if (analysisText) formData.append('analysis_text', analysisText);
@@ -100,7 +96,7 @@ export const analysisAPI = {
   generateChatTitle: (question: string, options: AnalysisChatOptions = {}, analysisText = '') => {
     const formData = new FormData();
     formData.append('question', question);
-    formData.append('llm_provider', options.provider || 'openai');
+    formData.append('llm_provider', options.provider || 'google');
     if (options.openaiApiKey) formData.append('openai_api_key', options.openaiApiKey);
     if (options.googleApiKey) formData.append('google_api_key', options.googleApiKey);
     if (analysisText) formData.append('analysis_text', analysisText);

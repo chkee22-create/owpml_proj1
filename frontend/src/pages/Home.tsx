@@ -165,7 +165,6 @@ function Home() {
   const handleMenuRouting = (menuName: string) => {
     const protectedMenus = [
       VIEW.SHARE,
-      VIEW.ANALYSIS,
       VIEW.PROJECTS,
       VIEW.MYPAGE,
       "프로필",
@@ -367,6 +366,11 @@ function Home() {
     VIEW.PROJECTS,
     VIEW.MYPAGE,
   ].includes(viewMode);
+  const isProtectedFullView = [
+    VIEW.SHARE,
+    VIEW.PROJECTS,
+    VIEW.MYPAGE,
+  ].includes(viewMode);
   
   const activeConversationId =
     viewMode === VIEW.ANALYSIS
@@ -377,7 +381,7 @@ function Home() {
       : null;
 
   useEffect(() => {
-    if (loading || isLoggedIn || !isFullView) return;
+    if (loading || isLoggedIn || !isProtectedFullView) return;
     setModalMode("recommend");
     navigateToView(VIEW.MAIN, {
       replace: true,
@@ -385,7 +389,7 @@ function Home() {
       clearShareOpenData: true,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, isLoggedIn, isFullView]);
+  }, [loading, isLoggedIn, isProtectedFullView]);
 
   return (
     <Container>
@@ -545,6 +549,7 @@ function Home() {
             restoredData={restoredData}
             clearRestore={() => setRestoredData(null)}
             onConversationChange={handleConversationChange}
+            onLoginRequired={() => setModalMode("recommend")}
           />
         )}
 
