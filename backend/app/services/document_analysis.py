@@ -755,6 +755,8 @@ def _extractive_summary(text: str, question: str = "", limit: int = 4) -> list[s
 
 
 # --- HWPX / HWP 파싱 보조 함수들 (PoC) -----------------------------
+# 이 영역은 HWPX와 HWP 문서에서 텍스트/이미지를 추출하는 전용 파서 로직입니다.
+# HWPX는 Zip+XML 기반 포맷이고, HWP는 구형 한글 바이너리 포맷이므로 각각 다른 접근을 사용합니다.
 def _parse_hwpx_bytes(data: bytes) -> tuple[str, list[dict]]:
     """HWPX(Zip+XML) 포맷을 안전하게 파싱합니다.
 
@@ -839,6 +841,9 @@ def _parse_hwpx_with_java(jar_path: str, data: bytes) -> tuple[str, list[dict]]:
 def _parse_hwp_bytes(data: bytes) -> tuple[str, list[dict]]:
     """HWP(바이너리) 파서는 외부 파서가 설치되어 있으면 시도합니다.
 
+    HWP는 구형 한글문서 바이너리 포맷이므로 일반 XML/Zip 파서로는 열리지 않습니다.
+    따라서 python-hwplib처럼 HWP 전용 라이브러리를 사용해 문서를 해석해야 합니다.
+
     - 우선 `hwplib` (python-hwplib) 모듈을 import 시도합니다.
     - 모듈이 없거나 실패하면 빈 텍스트와 빈 이미지 목록을 반환합니다.
     """
@@ -905,6 +910,8 @@ def parse_document(file_bytes: bytes, filename: str = "document") -> dict:
         return {'filename': filename, 'format': 'hwpx', 'text': text, 'images': images}
 
     if ext == '.hwp':
+        # HWP 바이너리 문서 처리는 _parse_hwp_bytes()에서 시도합니다.
+        # 이 함수는 python-hwplib 같은 외부 파서가 설치되어 있으면 HWP 내부 텍스트를 추출합니다.
         text, images = _parse_hwp_bytes(file_bytes)
         return {'filename': filename, 'format': 'hwp', 'text': text, 'images': images}
 

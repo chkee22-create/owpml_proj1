@@ -44,6 +44,7 @@ const VIEW = {
   ANALYSIS: "분석 비교",
   PROJECTS: "내 프로젝트",
   MYPAGE: "마이페이지",
+  FAQ: "FAQ",
 };
 
 const VIEW_TO_ROUTE = {
@@ -53,6 +54,7 @@ const VIEW_TO_ROUTE = {
   [VIEW.ANALYSIS]: "analysis",
   [VIEW.PROJECTS]: "projects",
   [VIEW.MYPAGE]: "mypage",
+  [VIEW.FAQ]: "faq",
 };
 
 const ROUTE_TO_VIEW = Object.fromEntries(
