@@ -403,7 +403,7 @@ async def analyze_chat(
                     "llm_error": llm_answer.get("llm_error"),
                     "llm_key_received": llm_key_received,
                     "llm_key_source": llm_key_source,
-                    "suggested_questions": [],
+                    "suggested_questions": llm_answer.get("suggested_questions", []),
                 }
         return {
             **fallback_answer,
@@ -414,7 +414,7 @@ async def analyze_chat(
             "llm_error": llm_answer.get("llm_error"),
             "llm_key_received": llm_key_received,
             "llm_key_source": llm_key_source,
-            "suggested_questions": [],
+            "suggested_questions": llm_answer.get("suggested_questions", []),
         }
 
     visual_config = _extract_json_object(llm_answer["answer"]) if is_visual_request else None
@@ -432,7 +432,7 @@ async def analyze_chat(
             "llm_key_source": llm_key_source,
             "provider": llm_answer.get("provider"),
             "model": llm_answer.get("model"),
-            "suggested_questions": [],
+            "suggested_questions": llm_answer.get("suggested_questions", []),
         }
 
     grounding = validate_grounding(
@@ -454,7 +454,7 @@ async def analyze_chat(
                     "llm_error": f"Visual grounding fallback used: {grounding.get('reason')}",
                     "llm_key_received": llm_key_received,
                     "llm_key_source": llm_key_source,
-                    "suggested_questions": [],
+                    "suggested_questions": llm_answer.get("suggested_questions", []),
                 }
         return {
             **fallback_answer,
@@ -465,7 +465,7 @@ async def analyze_chat(
             "llm_error": "OpenAI 답변에 문서 근거와 맞지 않는 내용이 있어 로컬 근거 답변으로 전환했습니다.",
             "llm_key_received": llm_key_received,
             "llm_key_source": llm_key_source,
-            "suggested_questions": [],
+            "suggested_questions": llm_answer.get("suggested_questions", []),
         }
 
     if visual_config:
@@ -482,7 +482,7 @@ async def analyze_chat(
             "llm_key_source": llm_key_source,
             "provider": llm_answer.get("provider"),
             "model": llm_answer.get("model"),
-            "suggested_questions": [],
+            "suggested_questions": llm_answer.get("suggested_questions", []),
         }
 
     return {
@@ -496,6 +496,9 @@ async def analyze_chat(
         "llm_used": True,
         "llm_key_received": llm_key_received,
         "llm_key_source": llm_key_source,
+        "provider": llm_answer.get("provider"),
+        "model": llm_answer.get("model"),
+        "suggested_questions": llm_answer.get("suggested_questions", []),
     }
 
 @router.post("/title")
