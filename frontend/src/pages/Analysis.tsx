@@ -282,8 +282,8 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
   const [activeFiles, setActiveFiles] = useState([]);
   const [promptText, setPromptText] = useState('');
   const [llmProvider, setLlmProvider] = useState(() => {
-    const configuredProvider = import.meta.env.VITE_LLM_PROVIDER || sessionStorage.getItem('papermate.llmProvider');
-    return configuredProvider === 'google' ? 'google' : 'openai';
+    const configuredProvider = import.meta.env.VITE_LLM_PROVIDER;
+    return configuredProvider === 'openai' ? 'openai' : 'google';
   });
   const [openaiApiKey, setOpenaiApiKey] = useState(() => sessionStorage.getItem('papermate.openaiApiKey') || '');
   const [googleApiKey, setGoogleApiKey] = useState(() => sessionStorage.getItem('papermate.googleApiKey') || '');

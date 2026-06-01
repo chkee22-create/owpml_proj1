@@ -1,6 +1,7 @@
 # 초보자 안내: OpenAI 또는 Gemini 같은 외부 AI API를 호출해 더 자연스러운 분석 답변을 만드는 서비스입니다.
 
 import json
+import os
 import re
 
 from app.core.config import settings
@@ -365,12 +366,12 @@ def _analyze_with_google(question: str, extracted_docs: list[dict], api_key: str
 def analyze_with_llm(
     question: str,
     extracted_docs: list[dict],
-    provider: str = "openai",
+    provider: str = "google",
     openai_api_key: str | None = None,
     google_api_key: str | None = None,
     analysis_text: str = "",
 ) -> dict:
-    normalized_provider = (provider or "openai").lower()
+    normalized_provider = (provider or "google").lower()
 
     if normalized_provider == "google":
         api_key = google_api_key or settings.google_api_key or settings.gemini_api_key
@@ -386,7 +387,7 @@ def analyze_with_llm(
 
 def generate_chat_title(
     question: str,
-    provider: str = "openai",
+    provider: str = "google",
     openai_api_key: str | None = None,
     google_api_key: str | None = None,
     analysis_text: str = ""
@@ -394,7 +395,7 @@ def generate_chat_title(
     """사용자의 첫 질문을 바탕으로 3~5단어의 짧은 제목을 생성합니다."""
     prompt = f"다음 질문(또는 분석 요청)을 바탕으로 대화방의 제목을 3~5단어 내외의 짧은 명사형으로 작성해.\n\n질문: {question}\n\n오직 제목만 출력할 것."
     
-    normalized_provider = (provider or "openai").lower()
+    normalized_provider = (provider or "google").lower()
 
     if normalized_provider == "google":
         api_key = google_api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
