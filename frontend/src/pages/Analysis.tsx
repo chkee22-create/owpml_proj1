@@ -37,7 +37,7 @@ const MAX_PROJECTS = 10;
 const MAX_VISUALS = 10;
 const MAX_RECENT_CONVERSATIONS = 50;
 
-const visualStorageKinds = new Set(['table', 'graph', 'image', 'mindmap', 'chart']);
+const visualStorageKinds = new Set(['table', 'graph', 'image', 'chart']);
 const isVisualStorageItem = (visual) => visualStorageKinds.has(visual?.kind) || visualStorageKinds.has(visual?.type);
 const normalizeVisualId = (id) => String(id || '').replace(/^(thread-|visual-|saved-)+/, '');
 
@@ -265,9 +265,32 @@ const buildLocalFallbackAnswer = (question, files, messages) => {
     .join('\n');
   const lines = splitMeaningfulLines(sourceText);
   const fileNames = files.length > 0 ? files.map((file) => file.name || '업로드 파일') : ['현재 대화 내용'];
+  const questionIntro = question
+    ? `질문하신 내용은 "${question}"에 관한 분석으로 보입니다. 제가 현재 남아 있는 문서 기록에서 먼저 뽑아볼게요.`
+    : '업로드한 문서를 기준으로 핵심 내용을 먼저 정리해볼게요.';
+
+  if (!lines.length) {
+    return [
+      questionIntro,
+      '',
+      '현재 분석할 문서 본문이 없습니다.',
+      '',
+      '[필요한 자료]',
+      files.length
+        ? `- 선택된 파일: ${fileNames.join(', ')}`
+        : '- 파일을 먼저 업로드해야 질문에 맞는 근거 문장을 뽑을 수 있습니다.',
+      '- "40대 여성 이동 동향"처럼 통계성 질문은 연령/성별/지역/기간이 들어 있는 표, CSV, PDF, HWPX 같은 원본 자료가 필요합니다.',
+      '',
+      '[다음 질문 예시]',
+      '- 업로드한 문서에서 40대 여성 이동 동향을 요약해줘.',
+      '- 40대 여성의 이동 증가/감소 지역을 표로 정리해줘.',
+    ].join('\n');
+  }
 
   return [
-    '로컬 기본 분석으로 처리했습니다.',
+    questionIntro,
+    '',
+    'LLM 없이 로컬 기본 분석으로 처리했습니다.',
     '',
     '[핵심 내용 요약]',
     ...(lines.length
@@ -307,12 +330,6 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
   const [files, setFiles] = useState([]);
   const [activeFiles, setActiveFiles] = useState([]);
   const [promptText, setPromptText] = useState('');
-  const [llmProvider, setLlmProvider] = useState(() => {
-    const configuredProvider = import.meta.env.VITE_LLM_PROVIDER;
-    return configuredProvider === 'openai' ? 'openai' : 'google';
-  });
-  const [openaiApiKey, setOpenaiApiKey] = useState(() => sessionStorage.getItem('papermate.openaiApiKey') || '');
-  const [googleApiKey, setGoogleApiKey] = useState(() => sessionStorage.getItem('papermate.googleApiKey') || '');
   const [messages, setMessages] = useState([
     { id: 'intro', role: 'ai', text: '분석을 시작하려면 파일을 업로드한 뒤 질문을 입력하세요.' },
   ]);
@@ -461,35 +478,6 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
     });
     return undefined;
   }, [selectedSourceFile]);
-
-  const handleProviderChange = (event) => {
-    const nextProvider = event.target.value;
-    setLlmProvider(nextProvider);
-    sessionStorage.setItem('papermate.llmProvider', nextProvider);
-  };
-
-  const handleApiKeyChange = (event) => {
-    const nextKey = event.target.value.trim();
-    if (llmProvider === 'google') {
-      setGoogleApiKey(nextKey);
-      if (nextKey) sessionStorage.setItem('papermate.googleApiKey', nextKey);
-      else sessionStorage.removeItem('papermate.googleApiKey');
-      return;
-    }
-    setOpenaiApiKey(nextKey);
-    if (nextKey) sessionStorage.setItem('papermate.openaiApiKey', nextKey);
-    else sessionStorage.removeItem('papermate.openaiApiKey');
-  };
-
-  const clearApiKey = () => {
-    if (llmProvider === 'google') {
-      setGoogleApiKey('');
-      sessionStorage.removeItem('papermate.googleApiKey');
-      return;
-    }
-    setOpenaiApiKey('');
-    sessionStorage.removeItem('papermate.openaiApiKey');
-  };
 
   const copyInviteCode = async () => {
     if (requireLoginForSave()) return;
@@ -672,11 +660,19 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
 
     try {
       const response = await analysisAPI.chat(question, requestFiles, {
-        provider: llmProvider,
+        provider: 'openai',
         conversationId: recentConversationIdRef.current,
       }, getLatestAnalysisText(messages));
+      const providerLabel = 'OpenAI';
+      const keySourceLabel = response.data?.llm_key_source === 'request'
+        ? '화면 입력 키'
+        : response.data?.llm_key_source === 'env'
+          ? '서버 .env 키'
+          : '없음';
       const providerNote = response.data?.provider
-        ? `\n\n분석 엔진: ${response.data.provider === 'google' ? 'Google Gemini' : 'OpenAI'}${response.data.model ? ` (${response.data.model})` : ''}`
+        ? response.data?.llm_used
+          ? `\n\n분석 엔진: ${providerLabel}${response.data.model ? ` (${response.data.model})` : ''}\nAPI 키: ${keySourceLabel}`
+          : `\n\n분석 엔진: 로컬 기본 분석\n선택 Provider: ${providerLabel}\nAPI 키: ${keySourceLabel}${response.data?.llm_error && response.data.llm_error !== 'No grounded document context' ? `\nLLM 호출 실패: ${response.data.llm_error}` : ''}`
         : '';
       const answer = response.data?.answer || response.data?.summary || buildLocalFallbackAnswer(question, pendingFiles, messages);
       const successMessage = hasNewUpload
@@ -706,7 +702,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
           ...parsedAssetData, // AI가 생성한 type, chartType, data 등을 전개
           id: `visual-${Date.now()}`,
           role: 'asset',
-          title: parsedAssetData.title || (question.includes('차트') || question.includes('표') || question.includes('비교') || question.includes('그래프') || question.includes('마인드맵') ? question : '데이터 시각화'),
+          title: parsedAssetData.title || (question.includes('차트') || question.includes('표') || question.includes('비교') || question.includes('그래프') ? question : '데이터 시각화'),
           saved: false,
           suggestedQuestions,
         };
@@ -725,7 +721,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
       // 첫 질문인 경우, 백그라운드에서 AI 채팅방 제목 생성 호출
       if (isNewConversation) {
         analysisAPI.generateChatTitle(question, {
-          provider: llmProvider,
+          provider: 'openai',
         }, getLatestAnalysisText(messages)).then(res => {
           if (res.data?.title) {
             upsertRecentConversation(messagesWithAnswer, question, pendingFiles, res.data.title);
@@ -1088,25 +1084,6 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
           <TopMenuBar>
             <h2>AI 분석 Q&amp;A</h2>
             <div className="actions">
-              {false && <div className="api-key-box">
-                <i className="fa-solid fa-key"></i>
-                <select value={llmProvider} onChange={handleProviderChange} aria-label="LLM 제공자 선택">
-                  <option value="openai">OpenAI</option>
-                  <option value="google">Google</option>
-                </select>
-                <input
-                  type="password"
-                  value={llmProvider === 'google' ? googleApiKey : openaiApiKey}
-                  placeholder={llmProvider === 'google' ? 'Google Gemini API key' : 'OpenAI API key'}
-                  onChange={handleApiKeyChange}
-                  autoComplete="off"
-                />
-                {((llmProvider === 'google' && googleApiKey) || (llmProvider === 'openai' && openaiApiKey)) && (
-                  <button type="button" className="clear-key" onClick={clearApiKey} aria-label="API 키 지우기">
-                    ×
-                  </button>
-                )}
-              </div>}
               <button type="button" onClick={openProjectSavePanel} disabled={isSavingProject}>
                 프로젝트 저장
               </button>
@@ -1186,7 +1163,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
                 )}
               </div>
             ))}
-            {isAnalyzing && <AiRow><div className="ai-box">{llmProvider === 'openai' ? 'OpenAI' : 'Gemini'}가 문서를 분석하고 있습니다...</div></AiRow>}
+            {isAnalyzing && <AiRow><div className="ai-box">OpenAI가 문서를 분석하고 있습니다...</div></AiRow>}
           </StreamMessageArea>
 
           <BottomPromptInput onKeyDownCapture={handlePromptEnter}>

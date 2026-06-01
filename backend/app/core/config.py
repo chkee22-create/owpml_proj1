@@ -171,7 +171,7 @@ def create_settings() -> Settings:
         google_client_id=(os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID", "")).strip(),
         gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip(),
-        enable_bert_grounding=_env_bool("ENABLE_BERT_GROUNDING", False),
+        enable_bert_grounding=_env_bool("ENABLE_BERT_GROUNDING", True),
         bert_grounding_model=os.getenv(
             "BERT_GROUNDING_MODEL",
             "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
@@ -182,7 +182,7 @@ def create_settings() -> Settings:
             "Given an answer sentence, retrieve the most relevant source passage from the uploaded document.",
         ).strip(),
         enable_topic_modeling=_env_bool("ENABLE_TOPIC_MODELING", True),
-        topic_model_backend=os.getenv("TOPIC_MODEL_BACKEND", "local").strip().lower(),
+        topic_model_backend=os.getenv("TOPIC_MODEL_BACKEND", "bertopic").strip().lower(),
         topic_model_limit=_env_int("TOPIC_MODEL_LIMIT", 5),
     )
     settings.validate()
