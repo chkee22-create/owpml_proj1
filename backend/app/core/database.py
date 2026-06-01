@@ -30,6 +30,8 @@ async def ensure_indexes() -> bool:
     try:
         # users.username: 로그인 아이디 중복 가입 방지와 로그인 조회용입니다.
         await db[USERS_COLLECTION].create_index("username", unique=True)
+        await db[USERS_COLLECTION].create_index("google_sub", unique=True, sparse=True)
+        await db[USERS_COLLECTION].create_index("email", sparse=True)
 
         # projects는 사용자별 프로젝트 id가 중복되지 않게 저장합니다.
         await db[PROJECTS_COLLECTION].create_index([("user_id", 1), ("project.id", 1)], unique=True)

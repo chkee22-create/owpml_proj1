@@ -1,8 +1,9 @@
-import React, { ChangeEvent, KeyboardEvent } from 'react';
+﻿import React, { ChangeEvent, KeyboardEvent, RefObject, useEffect, useRef } from 'react';
 import { FcGoogle } from 'react-icons/fc';
-import { RiKakaoTalkFill, RiRobot2Line } from 'react-icons/ri';
+import { RiKakaoTalkFill } from 'react-icons/ri';
 import { SiNaver } from 'react-icons/si';
 import { FiX } from 'react-icons/fi';
+import papermateLogo from '../assets/papermate-logo.png';
 import {
   CloseIconButton,
   FigAuthBox,
@@ -10,9 +11,8 @@ import {
   RecommendBody,
   RecommendBox,
   RecommendHeader,
-} from './styles/AuthModal.styles'; // 스타일 파일 확장자 주의
+} from './styles/AuthModal.styles';
 
-// 1. 타입 정의
 type ModalMode = 'login' | 'signup' | 'recommend' | null;
 
 interface FormData {
@@ -28,23 +28,74 @@ interface AuthModalProps {
   onInputChange: (e: ChangeEvent<HTMLInputElement>) => void;
   onLoginSubmit: () => void;
   onSignupSubmit: () => void;
+  onGoogleSubmit: (idToken: string) => void;
+  onGoogleError: (message: string) => void;
   authError: string | null;
   authLoading: boolean;
 }
 
-// 2. 내부 컴포넌트 타입 적용
-const SocialButtons = ({ mode }: { mode: 'login' | 'signup' }) => {
+const GOOGLE_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
+const DEFAULT_GOOGLE_ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:3004',
+  'http://127.0.0.1:3004',
+];
+
+const getAllowedGoogleOrigins = () => {
+  const configured = import.meta.env.VITE_GOOGLE_ALLOWED_ORIGINS || '';
+  const origins = configured
+    .split(',')
+    .map((origin: string) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  return origins.length ? origins : DEFAULT_GOOGLE_ALLOWED_ORIGINS;
+};
+
+const loadGoogleScript = () =>
+  new Promise<void>((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      `script[src="${GOOGLE_SCRIPT_SRC}"]`,
+    );
+
+    if (existingScript) {
+      if ((window as any).google?.accounts?.id) resolve();
+      else existingScript.addEventListener('load', () => resolve(), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = GOOGLE_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Google login script failed to load.'));
+    document.head.appendChild(script);
+  });
+
+const SocialButtons = ({
+  mode,
+  googleButtonRef,
+  googleClientId,
+}: {
+  mode: 'login' | 'signup';
+  googleButtonRef: RefObject<HTMLDivElement>;
+  googleClientId: string;
+}) => {
   const isSignup = mode === 'signup';
 
   return (
     <div className="social-stack">
-      <button className="social-btn google" type="button" aria-label="Google 연동">
-        <FcGoogle />
-        <span>{isSignup ? 'Gmail로 시작하기' : 'Google로 계속하기'}</span>
-      </button>
+      {googleClientId ? (
+        <div className="google-signin-slot" ref={googleButtonRef} aria-label="Google 연동" />
+      ) : (
+        <button className="social-btn google" type="button" disabled aria-label="Google 연동">
+          <FcGoogle />
+          <span>{googleClientId ? 'Google 출처 등록 필요' : 'Google Client ID 필요'}</span>
+        </button>
+      )}
       <button className="social-btn kakao" type="button" aria-label="카카오톡 연동">
         <RiKakaoTalkFill />
-        <span>{isSignup ? '카카오톡으로 시작하기' : '카카오로 계속하기'}</span>
+        <span>{isSignup ? '카카오톡으로 시작하기' : '카카오톡으로 계속하기'}</span>
       </button>
       <button className="social-btn naver" type="button" aria-label="네이버 연동">
         <SiNaver />
@@ -54,7 +105,6 @@ const SocialButtons = ({ mode }: { mode: 'login' | 'signup' }) => {
   );
 };
 
-// 3. 메인 컴포넌트
 function AuthModal({
   modalMode,
   setModalMode,
@@ -62,9 +112,56 @@ function AuthModal({
   onInputChange,
   onLoginSubmit,
   onSignupSubmit,
+  onGoogleSubmit,
+  onGoogleError,
   authError,
   authLoading,
 }: AuthModalProps) {
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+  const googleAllowedOrigins = getAllowedGoogleOrigins();
+  const googleOriginAllowed =
+    typeof window === 'undefined' || googleAllowedOrigins.includes(window.location.origin);
+
+  useEffect(() => {
+    if ((modalMode !== 'login' && modalMode !== 'signup') || !googleClientId) return;
+    if (!googleOriginAllowed) {
+      return;
+    }
+
+    let cancelled = false;
+
+    loadGoogleScript()
+      .then(() => {
+        if (cancelled || !googleButtonRef.current) return;
+
+        const google = (window as any).google;
+        google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: (response: { credential?: string }) => {
+            if (response.credential) onGoogleSubmit(response.credential);
+          },
+        });
+
+        googleButtonRef.current.innerHTML = '';
+        google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: 'outline',
+          size: 'large',
+          width: 348,
+          text: modalMode === 'signup' ? 'signup_with' : 'continue_with',
+        });
+      })
+      .catch(() => {
+        if (googleButtonRef.current) {
+          googleButtonRef.current.textContent = 'Google 로그인 버튼을 불러오지 못했습니다.';
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modalMode, googleClientId, googleOriginAllowed, onGoogleSubmit, onGoogleError]);
+
   if (!modalMode) return null;
 
   const handleEnterSubmit = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -82,8 +179,7 @@ function AuthModal({
           </CloseIconButton>
 
           <RecommendHeader>
-            <div className="logo-box"><RiRobot2Line /></div>
-            <div className="brand-title"><span>ChatBot AI</span>Paper Mate</div>
+            <img className="brand-logo" src={papermateLogo} alt="PaperMate" />
           </RecommendHeader>
 
           <RecommendBody>
@@ -104,12 +200,15 @@ function AuthModal({
           </CloseIconButton>
 
           <div className="popup-logo">
-            <div className="logo-icon"><RiRobot2Line /></div>
-            <div className="logo-text"><h2>Paper Mate</h2></div>
+            <img className="popup-logo-image" src={papermateLogo} alt="PaperMate" />
           </div>
 
           <h3 className="popup-title">{modalMode === 'login' ? '로그인' : '회원가입'}</h3>
-          <SocialButtons mode={modalMode === 'signup' ? 'signup' : 'login'} />
+          <SocialButtons
+            mode={modalMode === 'signup' ? 'signup' : 'login'}
+            googleButtonRef={googleButtonRef}
+            googleClientId={googleClientId}
+          />
           <div className="divider">{modalMode === 'login' ? '또는' : '또는 일반 가입'}</div>
 
           {modalMode === 'login' ? (

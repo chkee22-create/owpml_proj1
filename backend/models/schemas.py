@@ -15,6 +15,10 @@ class SignupRequest(BaseModel):
     password: str = Field(..., min_length=4, max_length=128)
 
 
+class GoogleAuthRequest(BaseModel):
+    id_token: str = Field(..., min_length=20)
+
+
 class LoginRequest(BaseModel):
     """로그인 요청 body입니다."""
 

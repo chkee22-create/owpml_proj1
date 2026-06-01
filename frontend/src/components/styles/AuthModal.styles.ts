@@ -50,43 +50,18 @@ export const RecommendBox = styled.div`
 `;
 
 export const RecommendHeader = styled.div`
-  background: #cdf4d3;
+  background: #f7fbef;
   border-bottom: 1px solid ${palette.slate[2]};
-  padding: 28px 24px;
+  padding: 24px 24px 20px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
 
-  .logo-box {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
-    background: ${palette.teal[5]};
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .logo-box svg {
-    width: 24px;
-    height: 24px;
-  }
-
-  .brand-title {
-    font-size: 16px;
-    font-weight: 800;
-    color: ${palette.slate[8]};
-    text-align: center;
-  }
-
-  .brand-title span {
+  .brand-logo {
+    width: 180px;
+    height: 72px;
+    object-fit: contain;
     display: block;
-    font-size: 11px;
-    color: ${palette.slate[7]};
-    font-weight: 700;
-    margin-top: 2px;
   }
 `;
 
@@ -144,33 +119,16 @@ export const FigAuthBox = styled.div`
 
   .popup-logo {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-
-  .logo-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
-    background: ${palette.teal[5]};
-    color: white;
-    display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: 16px;
   }
 
-  .logo-icon svg {
-    width: 28px;
-    height: 28px;
-  }
-
-  .logo-text h2 {
-    font-size: 22px;
-    font-weight: 800;
-    color: #343a40;
-    margin: 0;
+  .popup-logo-image {
+    width: 196px;
+    height: 78px;
+    object-fit: contain;
+    display: block;
   }
 
   .popup-title {
@@ -199,7 +157,23 @@ export const FigAuthBox = styled.div`
     padding: 0 14px;
     font-size: 15px;
     font-weight: 800;
-    cursor: default;
+    cursor: pointer;
+  }
+
+  .social-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  .google-signin-slot {
+    width: 100%;
+    min-height: 46px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .google-signin-slot > div {
+    width: 100% !important;
   }
 
   .social-btn svg {
@@ -325,9 +299,9 @@ export const FigAuthBox = styled.div`
       margin-bottom: 14px;
     }
 
-    .logo-icon {
-      width: 44px;
-      height: 44px;
+    .popup-logo-image {
+      width: 164px;
+      height: 64px;
     }
 
     .social-btn {

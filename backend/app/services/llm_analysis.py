@@ -9,7 +9,7 @@ from app.services.document_analysis import rank_relevant_chunks
 
 
 
-MAX_CONTEXT_CHARS = 18000
+MAX_CONTEXT_CHARS = 100000
 
 
 def _clip(text: str, limit: int = MAX_CONTEXT_CHARS) -> str:
@@ -19,24 +19,10 @@ def _clip(text: str, limit: int = MAX_CONTEXT_CHARS) -> str:
 
 
 def _build_ranked_document_context(question: str, extracted_docs: list[dict]) -> str:
-    ranked_chunks = rank_relevant_chunks(question, extracted_docs, 8)
-    if ranked_chunks:
-        blocks = []
-        for index, chunk in enumerate(ranked_chunks, start=1):
-            blocks.append(
-                "\n".join(
-                    [
-                        f"[관련 구간 {index}]",
-                        f"파일명: {chunk.get('filename', 'unknown')}",
-                        f"형식: {chunk.get('format', 'unknown')}",
-                        f"출처: {chunk.get('source_label') or 'Chunk ' + str(chunk.get('chunk_index'))}",
-                        f"관련도: {chunk.get('score')}",
-                        "본문:",
-                        _clip(chunk.get("text", ""), 3000),
-                    ]
-                )
-            )
-        return _clip("\n\n".join(blocks))
+    # 🚨 [CRITICAL FIX]: Do NOT use rank_relevant_chunks (TF-IDF) when using LLMs.
+    # The local chunking algorithm destroys the document structure and has a hardcoded bias
+    # for numbers/metrics, which hides crucial parts like the Introduction from the AI.
+    # GPT-4o-mini has a large enough context window to read the document directly.
 
     blocks = []
     for index, doc in enumerate(extracted_docs, start=1):
@@ -366,12 +352,12 @@ def _analyze_with_google(question: str, extracted_docs: list[dict], api_key: str
 def analyze_with_llm(
     question: str,
     extracted_docs: list[dict],
-    provider: str = "google",
+    provider: str = "openai",
     openai_api_key: str | None = None,
     google_api_key: str | None = None,
     analysis_text: str = "",
 ) -> dict:
-    normalized_provider = (provider or "google").lower()
+    normalized_provider = (provider or "openai").lower()
 
     if normalized_provider == "google":
         api_key = google_api_key or settings.google_api_key or settings.gemini_api_key
@@ -387,7 +373,7 @@ def analyze_with_llm(
 
 def generate_chat_title(
     question: str,
-    provider: str = "google",
+    provider: str = "openai",
     openai_api_key: str | None = None,
     google_api_key: str | None = None,
     analysis_text: str = ""
@@ -395,7 +381,7 @@ def generate_chat_title(
     """사용자의 첫 질문을 바탕으로 3~5단어의 짧은 제목을 생성합니다."""
     prompt = f"다음 질문(또는 분석 요청)을 바탕으로 대화방의 제목을 3~5단어 내외의 짧은 명사형으로 작성해.\n\n질문: {question}\n\n오직 제목만 출력할 것."
     
-    normalized_provider = (provider or "google").lower()
+    normalized_provider = (provider or "openai").lower()
 
     if normalized_provider == "google":
         api_key = google_api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")

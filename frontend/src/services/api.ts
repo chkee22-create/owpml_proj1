@@ -11,8 +11,9 @@ interface AnalysisChatOptions {
   conversationId?: string;
 }
 
-const isBrowserFile = (file: unknown): file is File =>
-  typeof File !== 'undefined' && file instanceof File;
+const isBrowserFile = (file: unknown): file is File | Blob =>
+  (typeof File !== 'undefined' && file instanceof File) ||
+  (typeof Blob !== 'undefined' && file instanceof Blob);
 
 const getApiBaseUrl = () => {
   // TypeScript 변경 표시: Vite에서는 CRA의 process.env 대신 import.meta.env로 환경변수를 읽습니다.
@@ -26,6 +27,9 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
+
+const CONNECTION_ERROR_MESSAGE =
+  '백엔드 서버와 연결할 수 없습니다. 서버가 켜져 있는지 확인한 뒤 다시 시도해주세요.';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -54,12 +58,20 @@ apiClient.interceptors.response.use(
   (error) => {
     const requestUrl = error.config?.url || '';
     const isAuthSubmitRequest =
-      requestUrl.includes('/api/auth/login') || requestUrl.includes('/api/auth/signup');
+      requestUrl.includes('/api/auth/login') ||
+      requestUrl.includes('/api/auth/signup') ||
+      requestUrl.includes('/api/auth/google');
+
+    if (!error.response) {
+      error.userMessage = CONNECTION_ERROR_MESSAGE;
+      return Promise.reject(error);
+    }
 
     if (error.response?.status === 401 && !isAuthSubmitRequest) {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('username');
+      localStorage.removeItem('userId');
       window.location.reload();
     }
     return Promise.reject(error);
@@ -72,6 +84,9 @@ export const authAPI = {
 
   login: (username: string, password: string) =>
     apiClient.post('/api/auth/login', { username, password }),
+
+  googleLogin: (idToken: string) =>
+    apiClient.post('/api/auth/google', { id_token: idToken }),
 
   healthCheck: () => apiClient.get('/api/health'),
 
@@ -96,9 +111,14 @@ export const analysisAPI = {
     if (options.openaiApiKey) formData.append('openai_api_key', options.openaiApiKey);
     if (options.googleApiKey) formData.append('google_api_key', options.googleApiKey);
     if (analysisText) formData.append('analysis_text', analysisText);
-    files.filter(isBrowserFile).forEach((file) => formData.append('files', file, file.name));
+    files.filter(isBrowserFile).forEach((file) => {
+      const filename = file instanceof File ? file.name : 'upload-file';
+      formData.append('files', file, filename);
+    });
 
-    return apiClient.post('/api/analysis/chat', formData);
+    return apiClient.post('/api/analysis/chat', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
   },
   generateChatTitle: (question: string, options: AnalysisChatOptions = {}, analysisText = '') => {
     const formData = new FormData();
@@ -115,9 +135,14 @@ export const analysisAPI = {
   createVisual: (type: string, files: File[], analysisText = '') => {
     const formData = new FormData();
     formData.append('analysis_text', analysisText);
-    files.filter(isBrowserFile).forEach((file) => formData.append('files', file, file.name));
+    files.filter(isBrowserFile).forEach((file) => {
+      const filename = file instanceof File ? file.name : 'upload-file';
+      formData.append('files', file, filename);
+    });
 
-    return apiClient.post(`/api/visuals/${encodeURIComponent(type)}`, formData);
+    return apiClient.post(`/api/visuals/${encodeURIComponent(type)}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
   },
 };
 

@@ -2,7 +2,7 @@
 // TypeScript 변경 표시: 기존 JS 로직은 유지하면서 함수 인자와 화면 props에 실제 타입을 붙여 TypeScript 검사를 통과하게 했습니다.
 // 초보자 안내: 사용자가 실제로 보게 되는 한 화면 단위의 React 페이지 컴포넌트입니다.
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Sidebar from "../components/Sidebar";
 import {
   FiBarChart2,
@@ -16,6 +16,7 @@ import MypageC from "./Mypage";
 import ShareC from "./Share";
 import AnalysisC from "./Analysis";
 import Project from "./Project";
+import FAQC from "./FAQ";
 import { useAuth } from "../context/AuthContext";
 import {
   Container,
@@ -37,6 +38,7 @@ import {
 import papermateLogo from "../assets/papermate-logo.png";
 
 const VIEW = {
+  FAQ: "FAQ",
   MAIN: "main",
   SHARE: "공유",
   ANALYSIS: "분석 비교",
@@ -45,6 +47,7 @@ const VIEW = {
 };
 
 const VIEW_TO_ROUTE = {
+  [VIEW.FAQ]: "faq",
   [VIEW.MAIN]: "home",
   [VIEW.SHARE]: "share",
   [VIEW.ANALYSIS]: "analysis",
@@ -81,13 +84,21 @@ const syncBrowserHistory = (view: string, replace = false) => {
   else window.history.pushState(state, "", nextUrl);
 };
 
+const getFriendlyAuthError = (error: any, fallback: string) => {
+  if (!error?.response) {
+    return error?.userMessage || "백엔드 서버와 연결할 수 없습니다. 서버가 켜져 있는지 확인한 뒤 다시 시도해주세요.";
+  }
+  return error.response?.data?.detail || error.message || fallback;
+};
+
 function Home() {
   const loadRecentConversations = () => {
     const parsed = readJson(getRecentConversationsKey(), []);
     return Array.isArray(parsed) ? parsed : [];
   };
 
-  const { isLoggedIn, user, logout, login, signup, loading } = useAuth();
+  const { isLoggedIn, user, logout, login, signup, googleLogin, loading } = useAuth();
+  const previousUserIdRef = useRef<string | null>(null);
   const [viewMode, setViewMode] = useState(getViewFromLocation);
   const [restoredData, setRestoredData] = useState<any>(null);
   const [shareOpenData, setShareOpenData] = useState<any>(null);
@@ -99,6 +110,7 @@ function Home() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [modalMode, setModalMode] = useState<string | null>(null);
+  const [pendingProtectedView, setPendingProtectedView] = useState<string | null>(null);
   const [analysisSessionKey, setAnalysisSessionKey] = useState(
     () => `analysis-${Date.now()}`,
   );
@@ -149,12 +161,21 @@ function Home() {
   }, []);
 
   useEffect(() => {
+    const previousUserId = previousUserIdRef.current;
+    const nextUserId = user?.id || null;
+    previousUserIdRef.current = nextUserId;
+
     setRecentConversations(loadRecentConversations());
-    setRestoredData(null);
-    setShareOpenData(null);
-    navigateToView(VIEW.MAIN, { replace: true });
+
+    if (!previousUserId) return;
+
+    if (!nextUserId || previousUserId !== nextUserId) {
+      setRestoredData(null);
+      setShareOpenData(null);
+      navigateToView(VIEW.MAIN, { replace: true });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, user?.username]);
+  }, [user?.id]);
 
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -171,6 +192,9 @@ function Home() {
     ];
 
     if (!isLoggedIn && protectedMenus.includes(menuName)) {
+      const protectedTarget =
+        menuName === VIEW.SHARE || menuName === VIEW.PROJECTS ? menuName : VIEW.MYPAGE;
+      setPendingProtectedView(protectedTarget);
       setModalMode("recommend");
       return;
     }
@@ -191,13 +215,19 @@ function Home() {
 
   const openLoginPopup = () => {
     setAuthError("");
+    setPendingProtectedView(null);
     setModalMode("login");
   };
 
   const openSignupPopup = () => {
     setAuthError("");
+    setPendingProtectedView(null);
     setModalMode("signup");
   };
+
+  const handleGoogleError = useCallback((message: string) => {
+    setAuthError(message);
+  }, []);
 
   const submitAuthRequest = async (mode: string) => {
     const usernameInput = formData.id.trim();
@@ -226,12 +256,40 @@ function Home() {
       }
       setModalMode(null);
       setFormData({ id: "", pw: "", confirmPw: "" });
+
+      if (pendingProtectedView) {
+        navigateToView(pendingProtectedView, {
+          clearRestoredData: pendingProtectedView !== VIEW.ANALYSIS,
+          clearShareOpenData: pendingProtectedView !== VIEW.SHARE,
+        });
+        setPendingProtectedView(null);
+      }
     } catch (error: any) {
-      setAuthError(
-        error.response?.data?.detail ||
-          error.message ||
-          "서버와 연결할 수 없습니다.",
-      );
+      setAuthError(getFriendlyAuthError(error, "로그인 처리 중 오류가 발생했습니다."));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const submitGoogleAuthRequest = async (idToken: string) => {
+    setAuthLoading(true);
+    setAuthError("");
+
+    try {
+      await googleLogin(idToken);
+      window.alert("Google로 로그인되었습니다.");
+      setModalMode(null);
+      setFormData({ id: "", pw: "", confirmPw: "" });
+
+      if (pendingProtectedView) {
+        navigateToView(pendingProtectedView, {
+          clearRestoredData: pendingProtectedView !== VIEW.ANALYSIS,
+          clearShareOpenData: pendingProtectedView !== VIEW.SHARE,
+        });
+        setPendingProtectedView(null);
+      }
+    } catch (error: any) {
+      setAuthError(getFriendlyAuthError(error, "Google 로그인에 실패했습니다."));
     } finally {
       setAuthLoading(false);
     }
@@ -361,10 +419,11 @@ function Home() {
   };
 
   const isFullView = [
-    VIEW.SHARE,
-    VIEW.ANALYSIS,
-    VIEW.PROJECTS,
-    VIEW.MYPAGE,
+  VIEW.SHARE,
+  VIEW.ANALYSIS,
+  VIEW.PROJECTS,
+  VIEW.MYPAGE,
+  VIEW.FAQ,
   ].includes(viewMode);
   const isProtectedFullView = [
     VIEW.SHARE,
@@ -382,6 +441,7 @@ function Home() {
 
   useEffect(() => {
     if (loading || isLoggedIn || !isProtectedFullView) return;
+    setPendingProtectedView(viewMode);
     setModalMode("recommend");
     navigateToView(VIEW.MAIN, {
       replace: true,
@@ -432,6 +492,7 @@ function Home() {
       >
         {!isFullView && (
           <TopAuth>
+            <span onClick={() => navigateToView(VIEW.FAQ)}>FAQ</span>
             {isLoggedIn ? (
               <span onClick={handleAbsoluteLogout}>Logout</span>
             ) : (
@@ -488,7 +549,7 @@ function Home() {
 
               {/* 두 번째 카드: 데이터 시각화 (📊 이모지) */}
               <FeatureCard
-                onClick={() => handleMenuRouting(VIEW.PROJECTS)}
+                onClick={() => handleMenuRouting(VIEW.ANALYSIS)}
                 $bgGradient="linear-gradient(135deg, #fff9c4 0%, #ffecb3 100%)"
               >
                 <div className="floating-emoji">📊</div>
@@ -536,6 +597,7 @@ function Home() {
         {viewMode === VIEW.MYPAGE && (
           <MypageC onLogoutClick={handleAbsoluteLogout} />
         )}
+        {viewMode === VIEW.FAQ && <FAQC />}
         {viewMode === VIEW.SHARE && (
           <ShareC
             onRestoreTrigger={handleTimelineRestoreJump}
@@ -555,11 +617,16 @@ function Home() {
 
         <AuthModal
           modalMode={modalMode}
-          setModalMode={setModalMode}
+          setModalMode={(mode) => {
+            setModalMode(mode);
+            if (!mode) setPendingProtectedView(null);
+          }}
           formData={formData}
           onInputChange={handleInputChange}
           onLoginSubmit={() => submitAuthRequest("login")}
           onSignupSubmit={() => submitAuthRequest("signup")}
+          onGoogleSubmit={submitGoogleAuthRequest}
+          onGoogleError={handleGoogleError}
           authError={authError}
           authLoading={authLoading}
         />

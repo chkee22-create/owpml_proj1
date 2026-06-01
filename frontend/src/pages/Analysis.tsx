@@ -48,6 +48,9 @@ const createInviteCode = () => {
 
 const formatDate = () => new Date().toLocaleDateString('ko-KR').replace(/. /g, '.').slice(0, -1);
 const getFileKey = (file) => `${file.name}-${file.size}-${file.lastModified || 0}`;
+const isUploadableFile = (file) =>
+  (typeof File !== 'undefined' && file instanceof File) ||
+  (typeof Blob !== 'undefined' && file instanceof Blob);
 
 const toStoredFiles = (files) =>
   files.map((file) => ({
@@ -139,9 +142,31 @@ const splitMeaningfulLines = (text) =>
     .filter((line) => line.length > 8)
     .slice(0, 8);
 
+const isNonEvidenceText = (text = '') => {
+  const value = String(text || '');
+  return [
+    '분석을 시작하려면 파일을 업로드',
+    '서버 분석 실패',
+    '파일 전송 실패',
+    '파일 전송 성공',
+    'LLM 없이 로컬 기본 분석',
+    '로컬 기본 분석으로 처리했습니다',
+    '아직 충분한 문서 텍스트가 없어',
+    '아직 발췌할 본문 텍스트가 없습니다',
+    '분석할 파일을 업로드해주세요',
+    '현재 분석할 문서 본문이 없습니다',
+  ].some((pattern) => value.includes(pattern));
+};
+
 const getLatestAnalysisText = (messages) => {
-  const latest = [...messages].reverse().find((message) => message.role === 'ai' && message.text);
-  return latest?.text || '업로드한 문서의 핵심 내용을 먼저 분석하거나 시각화를 생성하세요.';
+  const latest = [...messages]
+    .reverse()
+    .find((message) => (
+      ['ai', 'asset'].includes(message.role) &&
+      String(message.text || '').trim() &&
+      !isNonEvidenceText(message.text)
+    ));
+  return latest?.text || '';
 };
 
 const splitEvidenceSections = (text = '') => {
@@ -236,6 +261,7 @@ const buildLocalFallbackAnswer = (question, files, messages) => {
   const sourceText = messages
     .filter((message) => ['ai', 'asset', 'system'].includes(message.role))
     .map((message) => [message.text, message.desc, ...(message.details || []).map((detail) => detail.val)].filter(Boolean).join(' '))
+    .filter((text) => !isNonEvidenceText(text))
     .join('\n');
   const lines = splitMeaningfulLines(sourceText);
   const fileNames = files.length > 0 ? files.map((file) => file.name || '업로드 파일') : ['현재 대화 내용'];
@@ -585,7 +611,8 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
   const handleSendMessage = async (filesToSend = files, overrideQuestion = '') => {
     const nextQuestion = overrideQuestion || promptText.trim();
     const newFiles = [...filesToSend];
-    const requestFiles = newFiles;
+    const activeUploadFiles = activeFiles.filter(isUploadableFile);
+    const requestFiles = newFiles.length > 0 ? newFiles.filter(isUploadableFile) : activeUploadFiles;
     const pendingFiles = newFiles.length > 0 ? newFiles : [...activeFiles];
     const hasNewUpload = newFiles.length > 0;
     if (!nextQuestion && pendingFiles.length === 0) {
@@ -619,6 +646,28 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
     if (isNewConversation && typeof onConversationChange === 'function') {
       onConversationChange(recentConversationIdRef.current);
     }
+
+    const hasStoredFileNamesOnly = pendingFiles.length > 0 && requestFiles.length === 0 && !getLatestAnalysisText(messages);
+    if (hasStoredFileNamesOnly) {
+      const messagesWithAnswer = [
+        ...messagesWithQuestion,
+        {
+          id: `ai-${Date.now()}`,
+          role: 'ai',
+          text: [
+            '저장된 프로젝트에는 파일명만 남아 있고, 브라우저가 다시 전송할 수 있는 원본 파일 본문은 없습니다.',
+            '',
+            '[다시 필요한 작업]',
+            '- 같은 원본 파일을 클립 버튼으로 다시 업로드해주세요.',
+            '- 그 다음 질문을 보내면 서버가 문서 본문을 읽어서 요약, 발췌, 수치 후보를 만들 수 있습니다.',
+          ].join('\n'),
+        },
+      ];
+      setMessages(messagesWithAnswer);
+      upsertRecentConversation(messagesWithAnswer, question, pendingFiles);
+      return;
+    }
+
     setIsAnalyzing(true);
 
     try {
@@ -945,11 +994,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, clearRestore, onConv
       <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} multiple />
       <MainLayout>
         <VisualPanel>
-          <div
-            className={`compare-shell${isResizingSource ? ' is-resizing' : ''}`}
-            ref={compareShellRef}
-            style={{ '--source-pane-width': `${sourcePaneWidth}%` } as React.CSSProperties}
-          >
+          <div className="compare-shell">
             <section className="source-pane">
               <div className="panel-head">
                 <div>

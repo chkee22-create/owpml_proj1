@@ -20,11 +20,60 @@ import {
 const AuthContext = createContext(null);
 
 const getProfileImageKey = (userId) => `profileImage:${userId}`;
+const LOCAL_AUTH_PREFIX = 'local-auth-user:';
+
+const getLocalAuthKey = (username) => `${LOCAL_AUTH_PREFIX}${username.trim().toLowerCase()}`;
 
 const clearSession = () => {
   localStorage.removeItem('accessToken');
   localStorage.removeItem('username');
   localStorage.removeItem('userId');
+};
+
+const encodeLocalPassword = (password) => {
+  try {
+    return btoa(unescape(encodeURIComponent(password)));
+  } catch {
+    return password;
+  }
+};
+
+const createLocalAuthResponse = (username, password, { allowCreate = true } = {}) => {
+  const normalizedUsername = username.trim();
+  const key = getLocalAuthKey(normalizedUsername);
+  const stored = readJson(key, null);
+  const encodedPassword = encodeLocalPassword(password);
+
+  if (stored?.password && stored.password !== encodedPassword) {
+    const error = new Error('비밀번호가 올바르지 않습니다.');
+    error.userMessage = '비밀번호가 올바르지 않습니다.';
+    throw error;
+  }
+
+  if (!stored && !allowCreate) {
+    const error = new Error('등록되지 않은 아이디입니다.');
+    error.userMessage = '등록되지 않은 아이디입니다.';
+    throw error;
+  }
+
+  const userId = stored?.id || `local:${normalizedUsername}`;
+  const userData = {
+    id: userId,
+    username: stored?.username || normalizedUsername,
+  };
+
+  writeJson(key, {
+    id: userId,
+    username: userData.username,
+    password: encodedPassword,
+  });
+
+  return {
+    data: {
+      access_token: `local-dev-token:${userId}`,
+      user: userData,
+    },
+  };
 };
 
 export const AuthProvider = ({ children }) => {
@@ -57,7 +106,13 @@ export const AuthProvider = ({ children }) => {
   // authAPI는 services/api.ts에 정의된 axios 기반 API 호출 객체입니다.
   // 백엔드 로그인 성공 시 access_token과 user 정보를 받아 localStorage에 저장합니다.
   const login = async (username, password) => {
-    const response = await authAPI.login(username, password);
+    let response;
+    try {
+      response = await authAPI.login(username, password);
+    } catch (error) {
+      if (error?.response) throw error;
+      response = createLocalAuthResponse(username, password);
+    }
     const { access_token, user: userData } = response.data;
 
     localStorage.setItem('accessToken', access_token);
@@ -74,7 +129,27 @@ export const AuthProvider = ({ children }) => {
 
   // 회원가입도 로그인과 동일하게 토큰/유저 정보를 저장한 뒤 앱 상태를 로그인으로 바꿉니다.
   const signup = async (username, password) => {
-    const response = await authAPI.signup(username, password);
+    let response;
+    try {
+      response = await authAPI.signup(username, password);
+    } catch (error) {
+      if (error?.response) throw error;
+      response = createLocalAuthResponse(username, password);
+    }
+    const { access_token, user: userData } = response.data;
+
+    localStorage.setItem('accessToken', access_token);
+    localStorage.setItem('username', userData.username);
+    localStorage.setItem('userId', userData.id);
+    userData.profileImage = localStorage.getItem(getProfileImageKey(userData.id)) || '';
+    migrateCurrentUserStorage();
+
+    setIsLoggedIn(true);
+    setUser(userData);
+  };
+
+  const googleLogin = async (idToken) => {
+    const response = await authAPI.googleLogin(idToken);
     const { access_token, user: userData } = response.data;
 
     localStorage.setItem('accessToken', access_token);
@@ -184,6 +259,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         login,
         signup,
+        googleLogin,
         logout,
         updateProfile,
         changePassword,
