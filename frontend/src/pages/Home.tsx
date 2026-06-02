@@ -599,7 +599,12 @@ function Home() {
         {viewMode === VIEW.MYPAGE && (
           <MypageC onLogoutClick={handleAbsoluteLogout} />
         )}
-        {viewMode === VIEW.FAQ && <FAQC />}
+        {viewMode === VIEW.FAQ && (
+          <FAQC
+            onBackHome={() => navigateToView(VIEW.MAIN, { replace: true })}
+            showHomeLogo={isSidebarCollapsed}
+          />
+        )}
         {viewMode === VIEW.SHARE && (
           <ShareC
             onRestoreTrigger={handleTimelineRestoreJump}

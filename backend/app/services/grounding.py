@@ -2,7 +2,7 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 
-from app.core.config import settings
+from ..core.config import settings
 
 
 _WORD_RE = re.compile(r"[^\W_]{2,}", re.UNICODE)

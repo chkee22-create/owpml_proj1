@@ -1,16 +1,13 @@
 import re
+from importlib import import_module
 from collections import Counter
 
-from app.core.config import settings
+from ..core.config import settings
 
 
-# KoBERTopic 참고:
-# - Mecab 토크나이저
-# - 다국어 SBERT
-# - BERTopic
-# 을 한국어 문서에 맞게 조합하는 아이디어를 가져옵니다.
-# 실제 운영에서는 BERTopic 의존성이 무거울 수 있어 optional로 두고,
-# 설치되어 있지 않으면 아래 로컬 토큰 기반 주제 추출로 fallback합니다.
+# 문서 분석 결과의 [문서 주제 후보]를 만드는 서비스입니다.
+# 기본값은 가벼운 로컬 토큰/문장 기반 추출이고, BERTopic이 설치된 배포 환경에서는
+# settings.topic_model_backend="bertopic"일 때만 사전학습 임베딩 기반 토픽을 시도합니다.
 
 TOPIC_STOPWORDS = {
     "문서",
@@ -30,6 +27,15 @@ TOPIC_STOPWORDS = {
     "한다",
     "된다",
     "이다",
+    "했다",
+    "수행",
+    "수행한다",
+    "포함",
+    "포함한다",
+    "찾는다",
+    "계산",
+    "반복되",
+    "표현한다",
     "그리고",
     "그러나",
     "따라서",
@@ -60,42 +66,19 @@ def _split_units(text: str, limit: int = 160) -> list[str]:
 
 
 def _strip_suffix(word: str) -> str:
-    for suffix in ("에서는", "으로", "에서", "에게", "보다", "까지", "부터", "이며", "이고", "지만", "라는", "은", "는", "이", "가", "을", "를", "에", "의", "도", "와", "과", "로"):
-        if word.endswith(suffix) and len(word) > len(suffix) + 1:
+    for suffix in ("에서는", "으로", "에서", "에게", "보다", "까지", "부터", "이며", "이고", "지만", "라는", "되는", "한다", "된다", "했다", "은", "는", "이", "가", "을", "를", "에", "의", "도", "와", "과", "로"):
+        if word.endswith(suffix) and len(word) > len(suffix):
             return word[: -len(suffix)]
     return word
 
 
 def _tokenize(text: str) -> list[str]:
-    try:
-        from konlpy.tag import Mecab
-
-        mecab = Mecab()
-        return [
-            token.lower()
-            for token, pos in mecab.pos(text)
-            if pos.startswith("N") and len(token.strip()) >= 2
-        ]
-    except Exception:
-        pass
-
-    try:
-        from konlpy.tag import Okt
-
-        okt = Okt()
-        return [
-            token.lower()
-            for token, pos in okt.pos(text, norm=True, stem=True)
-            if pos in {"Noun", "Alpha"} and len(token.strip()) >= 2
-        ]
-    except Exception:
-        pass
-
-    return [
-        _strip_suffix(word)
-        for word in re.findall(r"[A-Za-z가-힣0-9]{2,}", text.lower())
-        if not word.isdigit()
-    ]
+    tokens = []
+    for word in re.findall(r"[A-Za-z가-힣0-9]{2,}", text.lower()):
+        token = _strip_suffix(word)
+        if len(token) >= 2 and not token.isdigit():
+            tokens.append(token)
+    return tokens
 
 
 def _local_topics(units: list[str], limit: int) -> list[dict]:
@@ -123,7 +106,7 @@ def _local_topics(units: list[str], limit: int) -> list[dict]:
             if term not in used_keywords and term not in related_keywords:
                 related_keywords.append(term)
 
-        used_keywords.update(related_keywords[:3])
+        used_keywords.update(related_keywords)
         label = " / ".join(related_keywords[:3])
         topics.append(
             {
@@ -147,8 +130,8 @@ def _bertopic_topics(units: list[str], limit: int) -> list[dict] | None:
         return None
 
     try:
-        from bertopic import BERTopic
-        from sentence_transformers import SentenceTransformer
+        BERTopic = import_module("bertopic").BERTopic
+        SentenceTransformer = import_module("sentence_transformers").SentenceTransformer
     except Exception:
         return None
 

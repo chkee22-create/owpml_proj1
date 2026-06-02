@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Iterable
 from xml.etree import ElementTree
 
-from app.core.config import settings
-from app.services.topic_modeling import extract_topics
+from ..core.config import settings
+from .topic_modeling import extract_topics
 
 # 이 파일은 AI가 직접 동작하는 곳이 아니라, AI에 넣을 텍스트를 준비하는 전처리 서비스입니다.
 # 파일 형식별로 본문 텍스트를 추출하고, OpenAI 키가 없을 때 쓸 기본 분석 결과도 만듭니다.
@@ -24,16 +24,11 @@ from app.services.topic_modeling import extract_topics
 # - olefile + struct + zlib: 구형 HWP 바이너리 본문 추출 시도
 # - Pillow(PIL): 이미지 크기/형식 확인
 # - pytesseract: 이미지 속 글자 OCR. 단, PC에 Tesseract 실행 파일도 별도 설치되어야 합니다.
-# 선택 사용 라이브러리:
-# - soynlp: 반복 문자 정규화. 설치되어 있으면 "ㅋㅋㅋㅋ", "ㅠㅠㅠㅠ" 같은 반복을 줄입니다.
-# - customized_konlpy: 사용자 사전을 넣어 한국어 전문용어가 잘게 쪼개지는 문제를 줄입니다.
-# - pykospacing: 띄어쓰기 보정. 설치되어 있고 텍스트가 너무 길지 않을 때만 사용합니다.
 
 TEXT_EXTENSIONS = {".txt", ".md", ".csv"}
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 CHUNK_SIZE = 900
 CHUNK_OVERLAP = 160
-MAX_SPACING_CHARS = 3000
 EXTRACTION_NOISE_PATTERN = re.compile(r"[\u0100-\u024f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]+")
 IMAGE_META_PATTERNS = (
     re.compile(r"원본\s*그림의\s*이름\s*:\s*CLP[^\s]+", re.IGNORECASE),
@@ -221,54 +216,19 @@ def _clean_text(text: str) -> str:
 
 
 def _normalize_repeated_korean(text: str) -> str:
-    """반복 문자와 감탄 표현을 정리합니다.
-
-    soynlp가 있으면 emoticon_normalize/repeat_normalize를 사용하고,
-    없으면 같은 문자가 3번 이상 반복되는 경우를 2번으로 줄입니다.
-    """
+    """반복 문자와 감탄 표현을 가벼운 정규식으로 정리합니다."""
 
     if not text:
         return ""
 
-    try:
-        from soynlp.normalizer import emoticon_normalize, repeat_normalize
-
-        normalized = emoticon_normalize(text, num_repeats=2)
-        return repeat_normalize(normalized, num_repeats=2)
-    except ModuleNotFoundError:
-        return re.sub(r"(.)\1{2,}", r"\1\1", text)
-    except Exception:
-        return re.sub(r"(.)\1{2,}", r"\1\1", text)
+    return re.sub(r"(.)\1{2,}", r"\1\1", text)
 
 
-def _maybe_fix_spacing(text: str) -> str:
-    """선택형 띄어쓰기 보정입니다.
-
-    PyKoSpacing은 설치가 무겁고 환경 영향을 많이 받으므로 필수로 쓰지 않습니다.
-    설치되어 있고 텍스트가 짧을 때만 사용해 서버 응답 지연을 피합니다.
-    """
-
-    if not text or len(text) > MAX_SPACING_CHARS:
-        return text
-
-    try:
-        from pykospacing import Spacing
-    except ModuleNotFoundError:
-        return text
-
-    try:
-        return Spacing()(text)
-    except Exception:
-        return text
-
-
-def preprocess_korean_text(text: str, fix_spacing: bool = False) -> str:
+def preprocess_korean_text(text: str) -> str:
     """문서 분석 전 한국어 텍스트를 정제/정규화하는 공통 입구입니다."""
 
     cleaned = _clean_text(text)
     normalized = _normalize_repeated_korean(cleaned)
-    if fix_spacing:
-        normalized = _maybe_fix_spacing(normalized)
     return _clean_text(normalized)
 
 
@@ -340,24 +300,9 @@ def _regex_terms(text: str) -> list[str]:
 
 
 def _tokenize_terms(text: str) -> list[str]:
-    """선택형 한국어 토큰화입니다.
+    """가벼운 정규식 기반 한국어/영어 토큰화입니다."""
 
-    customized_konlpy가 설치되어 있으면 사용자 사전을 넣어 전문용어를 보호하고,
-    설치되어 있지 않으면 정규식 기반 토큰화로 그대로 진행합니다.
-    """
-
-    try:
-        from ckonlpy.tag import Twitter
-    except ModuleNotFoundError:
-        return _regex_terms(text)
-
-    try:
-        tokenizer = Twitter()
-        for term in DOMAIN_TERMS:
-            tokenizer.add_dictionary(term, "Noun")
-        return [_strip_korean_suffix(token.lower()) for token in tokenizer.morphs(text) if len(token.strip()) >= 2]
-    except Exception:
-        return _regex_terms(text)
+    return _regex_terms(text)
 
 
 def _expanded_query_terms(question: str) -> set[str]:
@@ -404,18 +349,42 @@ def _sentence_quality_score(sentence: str) -> float:
     return score
 
 
-def _semantic_sentence_scores(question: str, sentences: list[str]) -> list[float] | None:
-    """선택형 BERT/Qwen 임베딩으로 질문과 문장 사이의 의미 유사도를 계산합니다.
+def _safe_cosine(left, right) -> float:
+    try:
+        numerator = sum(float(a) * float(b) for a, b in zip(left, right))
+        left_norm = math.sqrt(sum(float(a) * float(a) for a in left))
+        right_norm = math.sqrt(sum(float(b) * float(b) for b in right))
+        if not left_norm or not right_norm:
+            return 0.0
+        return numerator / (left_norm * right_norm)
+    except Exception:
+        return 0.0
+
+
+def _mean_vector(vectors: list) -> list[float]:
+    if not vectors:
+        return []
+    width = len(vectors[0])
+    return [
+        sum(float(vector[index]) for vector in vectors) / len(vectors)
+        for index in range(width)
+    ]
+
+
+def _semantic_text_features(anchor: str, texts: list[str]) -> dict | None:
+    """이미 학습된 임베딩 모델로 텍스트 중요도 특징을 계산합니다.
 
     sentence-transformers가 없거나 ENABLE_BERT_GROUNDING=false이면 None을 반환하고
-    기존 규칙 기반 발췌만 사용합니다.
+    기존 규칙 기반 발췌만 사용합니다. 새로 학습하지 않고, 사전학습 모델의 의미 공간에서
+    질문 관련성(relevance)과 문서 중심성(centrality)을 함께 봅니다.
     """
 
-    if not question or not sentences or not settings.enable_bert_grounding:
+    cleaned_texts = [_clean_text(text) for text in texts if _clean_text(text)]
+    if not cleaned_texts or not settings.enable_bert_grounding:
         return None
 
     try:
-        from .grounding import _cosine, _embedding_model
+        from .grounding import _embedding_model
     except Exception:
         return None
 
@@ -424,11 +393,13 @@ def _semantic_sentence_scores(question: str, sentences: list[str]) -> list[float
         return None
 
     instruction = settings.bert_grounding_instruction
-    query = f"Instruct: {instruction}\nQuery: {question}" if instruction else question
+    default_anchor = "문서의 핵심 주장, 중요한 근거, 실험 결과, 수치, 결론"
+    query_text = anchor or default_anchor
+    query = f"Instruct: {instruction}\nQuery: {query_text}" if instruction else query_text
 
     try:
         embeddings = model.encode(
-            [query, *sentences],
+            [query, *cleaned_texts],
             normalize_embeddings=True,
             show_progress_bar=False,
         )
@@ -437,7 +408,58 @@ def _semantic_sentence_scores(question: str, sentences: list[str]) -> list[float
 
     vectors = embeddings.tolist() if hasattr(embeddings, "tolist") else embeddings
     query_vector = vectors[0]
-    return [round(_cosine(query_vector, sentence_vector), 4) for sentence_vector in vectors[1:]]
+    text_vectors = vectors[1:]
+    centroid = _mean_vector(text_vectors)
+    return {
+        "texts": cleaned_texts,
+        "vectors": text_vectors,
+        "relevance": [round(_safe_cosine(query_vector, vector), 4) for vector in text_vectors],
+        "centrality": [round(_safe_cosine(centroid, vector), 4) for vector in text_vectors],
+    }
+
+
+def _select_diverse_ranked(
+    ranked: list[dict],
+    limit: int,
+    vectors: list | None = None,
+    *,
+    penalty: float = 5.0,
+) -> list[dict]:
+    """MMR 방식으로 점수는 높지만 서로 너무 비슷한 항목은 덜 뽑습니다."""
+
+    if not ranked or limit <= 0:
+        return []
+    if not vectors:
+        return ranked[:limit]
+
+    selected: list[dict] = []
+    remaining = list(ranked)
+    while remaining and len(selected) < limit:
+        best_item = None
+        best_adjusted = -10**9
+        for item in remaining:
+            adjusted = float(item.get("score", 0.0))
+            if selected:
+                item_index = item.get("vector_index")
+                if isinstance(item_index, int) and 0 <= item_index < len(vectors):
+                    redundancy = max(
+                        (
+                            _safe_cosine(vectors[item_index], vectors[selected_item["vector_index"]])
+                            for selected_item in selected
+                            if isinstance(selected_item.get("vector_index"), int)
+                            and 0 <= selected_item["vector_index"] < len(vectors)
+                        ),
+                        default=0.0,
+                    )
+                    adjusted -= max(0.0, redundancy) * penalty
+            if adjusted > best_adjusted:
+                best_adjusted = adjusted
+                best_item = item
+        if best_item is None:
+            break
+        selected.append(best_item)
+        remaining.remove(best_item)
+    return selected
 
 
 # 기본 분석에서 중요한 문장 후보를 고르기 위한 점수 함수입니다.
@@ -485,35 +507,51 @@ def _top_sentences(text: str, limit: int = 5, question: str = "") -> list[str]:
 
     query_terms = _expanded_query_terms(question) if question else set()
     term_weights = Counter(_tokenize_terms(text))
-    semantic_scores = _semantic_sentence_scores(question, sentences)
+    semantic_features = _semantic_text_features(question, sentences)
+    semantic_relevance = semantic_features.get("relevance", []) if semantic_features else []
+    semantic_centrality = semantic_features.get("centrality", []) if semantic_features else []
+    semantic_vectors = semantic_features.get("vectors", []) if semantic_features else []
     scored = []
     for index, sentence in enumerate(sentences):
         matched_count, coverage = _sentence_query_overlap(sentence, query_terms)
-        semantic_score = semantic_scores[index] if semantic_scores else None
+        relevance_score = semantic_relevance[index] if index < len(semantic_relevance) else 0.0
+        centrality_score = semantic_centrality[index] if index < len(semantic_centrality) else 0.0
         score = (
             _keyword_score(sentence, query_terms, term_weights)
             + max(0, 1.6 - index * 0.04)  # 초반 문장에 약간 가중치
         )
-        if semantic_score is not None:
-            score += semantic_score * 18
-        scored.append((index, sentence, matched_count, coverage, score, semantic_score or 0.0))
+        if semantic_features:
+            score += relevance_score * 14
+            score += centrality_score * 10
+        scored.append({
+            "index": index,
+            "vector_index": index,
+            "sentence": sentence,
+            "matched_count": matched_count,
+            "coverage": coverage,
+            "score": round(score, 4),
+            "semantic_relevance": relevance_score,
+            "semantic_centrality": centrality_score,
+        })
 
     ranked = sorted(
         scored,
         key=lambda item: (
-            item[4],
-            item[5],
-            item[3],
-            -item[0],
+            item["score"],
+            item["semantic_relevance"],
+            item["semantic_centrality"],
+            item["coverage"],
+            -item["index"],
         ),
         reverse=True,
     )
     if question and not _question_wants_negative(question):
-        non_negative = [item for item in ranked if not _is_negative_sentence(item[1])]
+        non_negative = [item for item in ranked if not _is_negative_sentence(item["sentence"])]
         if non_negative:
             ranked = non_negative
-    selected = sorted(ranked[:limit], key=lambda item: item[0])
-    return [sentence for _, sentence, *_ in selected]
+    selected = _select_diverse_ranked(ranked, limit, semantic_vectors, penalty=4.5)
+    selected = sorted(selected, key=lambda item: item["index"])
+    return [item["sentence"] for item in selected]
 
 
 # 자주 등장하는 단어를 뽑아 키워드 목록을 만듭니다.
@@ -679,9 +717,13 @@ def rank_relevant_chunks(question: str, extracted_docs: list[dict], limit: int =
         "합계출산율",
     )
     idf = _idf_weights([item["text"] for item in candidates])
+    semantic_features = _semantic_text_features(question, [item["text"] for item in candidates])
+    semantic_relevance = semantic_features.get("relevance", []) if semantic_features else []
+    semantic_centrality = semantic_features.get("centrality", []) if semantic_features else []
+    semantic_vectors = semantic_features.get("vectors", []) if semantic_features else []
 
     ranked = []
-    for item in candidates:
+    for vector_index, item in enumerate(candidates):
         term_counts = Counter(_tokenize_terms(item["text"]))
         if not term_counts:
             continue
@@ -704,13 +746,24 @@ def rank_relevant_chunks(question: str, extracted_docs: list[dict], limit: int =
         score += sum(1.2 for term in rank_terms if term in compact_text)
         matched_count, coverage = _sentence_query_overlap(item["text"], query_terms)
         score += matched_count * 1.8 + coverage * 5.0
+        relevance_score = semantic_relevance[vector_index] if vector_index < len(semantic_relevance) else 0.0
+        centrality_score = semantic_centrality[vector_index] if vector_index < len(semantic_centrality) else 0.0
+        if semantic_features:
+            score += relevance_score * 10
+            score += centrality_score * 6
         if "원본그림" in compact_text or "수식입니다" in item["text"]:
             score -= 8
 
-        ranked.append({**item, "score": round(score, 4)})
+        ranked.append({
+            **item,
+            "score": round(score, 4),
+            "vector_index": vector_index,
+            "semantic_relevance": relevance_score,
+            "semantic_centrality": centrality_score,
+        })
 
     ranked.sort(key=lambda item: item["score"], reverse=True)
-    return ranked[:limit]
+    return _select_diverse_ranked(ranked, limit, semantic_vectors, penalty=4.0)
 
 
 # 정확도/성능 수치처럼 논문 비교에 자주 필요한 값을 규칙 기반으로 뽑습니다.
@@ -934,7 +987,7 @@ def _parsed_text_or_message(parsed: dict, empty_message: str) -> str:
 def _finalize_extracted_text(text: str) -> str:
     """파일별 추출기가 반환한 텍스트를 분석용으로 최종 전처리합니다."""
 
-    return preprocess_korean_text(text, fix_spacing=False)
+    return preprocess_korean_text(text)
 
 
 def _source_label(file_format: str, number: int | None = None) -> str:
@@ -1022,23 +1075,6 @@ def _doc_brief(doc: dict) -> dict:
 # 각 페이지의 텍스트를 page.get_text("text")로 꺼내 이어 붙입니다.
 def extract_pdf(content: bytes) -> str:
     return "\n".join(unit["text"] for unit in extract_pdf_units(content))
-
-
-def extract_pdf_units(content: bytes) -> list[dict]:
-    try:
-        import fitz
-    except ModuleNotFoundError:
-        return "PDF 분석을 위해 PyMuPDF 패키지가 필요합니다. requirements.txt 설치 후 다시 시도해주세요."
-
-    with fitz.open(stream=content, filetype="pdf") as document:
-        texts: list[str] = []
-        for page in document:
-            page_text = page.get_text("text")
-            if isinstance(page_text, str):
-                texts.append(page_text)
-            elif page_text is not None:
-                texts.append(str(page_text))
-        return "\n".join(texts)
 
 
 def extract_pdf_units(content: bytes) -> list[dict]:
