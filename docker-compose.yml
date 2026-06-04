@@ -23,6 +23,7 @@ services:
       ENABLE_BERT_GROUNDING: "true"
       ENABLE_TOPIC_MODELING: "true"
       TOPIC_MODEL_BACKEND: "bertopic"
+      VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
     ports:
       - "8000:8000"
     depends_on:
