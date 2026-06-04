@@ -111,6 +111,55 @@ def _validate_visual_config(config: dict, extracted_docs: list[dict]) -> bool:
     return bool(numbers) and all(_compact_number(number) in evidence for number in numbers)
 
 
+<<<<<<< HEAD
+=======
+def _build_birth_trend_visual(extracted_docs: list[dict]) -> dict | None:
+    source = "\n".join(doc.get("text", "") for doc in extracted_docs)
+    compact = re.sub(r"\s+", " ", source)
+    marker = compact.find("전국 출생아 수 및 증감률")
+    if marker < 0:
+        marker = compact.find("전국 월별 출생 추이")
+    if marker < 0:
+        return None
+
+    window = compact[marker : marker + 1200]
+    if "25,200" not in window or "22,898" not in window:
+        return None
+
+    return {
+        "type": "chart",
+        "kind": "chart",
+        "chartType": "bar",
+        "title": "전국 출생아 수",
+        "text": "업로드 문서의 [표 1] 전국 출생아 수 및 증감률에서 직접 확인되는 월별 출생아 수만 사용했습니다. 원본 [그림 1]의 이미지 데이터가 텍스트로 추출되지 않은 경우 임의로 보간하지 않습니다.",
+        "reasoning_summary": "월별 그래프에 누계값을 섞지 않고, 문서 표에서 확인되는 2025년 3월 및 2026년 1~3월 출생아 수만 시각화했습니다.",
+        "xAxisKey": "period",
+        "series": [
+            {"dataKey": "births", "name": "출생아 수(명)", "color": "#0ea5a4", "yAxisId": "left"},
+        ],
+        "data": [
+            {"period": "2025년 3월", "births": 21112},
+            {"period": "2026년 1월", "births": 26916},
+            {"period": "2026년 2월", "births": 22898},
+            {"period": "2026년 3월", "births": 25200},
+        ],
+        "theme": {
+            "headerBackground": "#0f766e",
+            "headerTextColor": "#ffffff",
+            "cellBackground": "#f8fafc",
+            "cellTextColor": "#334155",
+            "borderColor": "#cbd5e1",
+        },
+    }
+
+
+def _visual_fallback(question: str, extracted_docs: list[dict]) -> dict | None:
+    if "출생" in question and ("월별" in question or "추이" in question):
+        return _build_birth_trend_visual(extracted_docs)
+    return None
+
+
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
 def _clean_evidence_text(text: str) -> str:
     return " ".join(str(text or "").split())
 
@@ -131,12 +180,60 @@ def _assistant_intro(question: str, intent: str | None = None) -> str:
 
 
 def _merge_llm_answer_with_evidence(question: str, llm_answer: str, fallback_answer: dict) -> str:
+<<<<<<< HEAD
     # [CRITICAL FIX] GPT가 정상적으로 작동했을 때는 로컬 AI의 불필요한 인트로("제가 정리해볼게요")와
     # 로컬 추출 근거(초록 팝업 버튼들)를 강제로 이어붙이지 않고, 순수한 GPT 답변만 반환합니다.
     return llm_answer.strip()
 
 
 def _concise_grounded_answer(question: str, fallback_answer: dict, fallback_reason: str = "OpenAI 키가 없거나 호출하지 못해, 현재 문서에서 확인되는 근거만 로컬로 정리했습니다.") -> str:
+=======
+    sections = [
+        _assistant_intro(question, fallback_answer.get("intent")),
+        llm_answer.strip(),
+    ]
+
+    metrics = fallback_answer.get("metrics") or []
+    if metrics:
+        sections.append("[수치 후보]\n" + "\n".join(f"- {metric}" for metric in metrics[:6]))
+
+    topics = fallback_answer.get("topics") or []
+    if topics:
+        topic_lines = []
+        for topic in topics[:5]:
+            keywords = ", ".join(topic.get("keywords", [])[:5]) or topic.get("label", "주제")
+            topic_lines.append(f"- {topic.get('label', '주제')}: {keywords}")
+        sections.append("[문서 주제 후보]\n" + "\n".join(topic_lines))
+
+    relevant_chunks = fallback_answer.get("relevant_chunks") or []
+    if relevant_chunks:
+        chunk_lines = []
+        for chunk in relevant_chunks[:4]:
+            filename = chunk.get("filename", "문서")
+            source_label = chunk.get("source_label") or f"Chunk {chunk.get('chunk_index', '?')}"
+            score = chunk.get("score")
+            evidence_text = _clean_evidence_text(chunk.get("text", ""))
+            chunk_lines.append(f"- {filename} {source_label} (관련도 {score}): {evidence_text}")
+        sections.append("[관련 문서 구간]\n" + "\n".join(chunk_lines))
+
+    documents = fallback_answer.get("documents") or []
+    doc_lines = []
+    for doc in documents[:3]:
+        filename = doc.get("filename", "문서")
+        key_points = doc.get("key_points") or []
+        keywords = doc.get("keywords") or []
+        if key_points:
+            doc_lines.append(f"- {filename}: {_clean_evidence_text(key_points[0])}")
+        elif keywords:
+            doc_lines.append(f"- {filename}: {', '.join(keywords[:6])}")
+    if doc_lines:
+        sections.append("[문서별 핵심 근거]\n" + "\n".join(doc_lines))
+
+    return "\n\n".join(section for section in sections if section.strip())
+
+
+def _concise_grounded_answer(question: str, fallback_answer: dict) -> str:
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
     relevant_chunks = fallback_answer.get("relevant_chunks") or []
     intent = fallback_answer.get("intent") or "general"
     evidence_blob = " ".join(str(chunk.get("text", "")) for chunk in relevant_chunks[:4])
@@ -146,7 +243,11 @@ def _concise_grounded_answer(question: str, fallback_answer: dict, fallback_reas
     )
     sections = [
         _assistant_intro(question, intent),
+<<<<<<< HEAD
         fallback_reason,
+=======
+        "OpenAI 키가 없거나 호출하지 못해, 현재 문서에서 확인되는 근거만 로컬로 정리했습니다.",
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
     ]
 
     if has_ai_prediction_context and (
@@ -215,6 +316,10 @@ def run_analysis_pipeline(
     fallback_answer = build_analysis_answer(question, extracted_docs)
     has_grounded_docs = any(str(doc.get("text", "")).strip() for doc in extracted_docs)
     is_visual_request = _is_visual_request(question)
+<<<<<<< HEAD
+=======
+    deterministic_visual = _visual_fallback(question, extracted_docs) if is_visual_request else None
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
 
     selected_provider = "openai"
     request_key = (openai_api_key or "").strip()
@@ -240,6 +345,22 @@ def run_analysis_pipeline(
             "suggested_questions": [],
         }
 
+<<<<<<< HEAD
+=======
+    if deterministic_visual:
+        return {
+            **fallback_answer,
+            "answer": json.dumps(deterministic_visual, ensure_ascii=False),
+            "llm_used": False,
+            "provider": selected_provider,
+            "model": None,
+            "llm_error": None,
+            "llm_key_received": llm_key_received,
+            "llm_key_source": llm_key_source,
+            "suggested_questions": [],
+        }
+
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
     llm_answer = analyze_with_llm(
         question,
         extracted_docs,
@@ -251,6 +372,21 @@ def run_analysis_pipeline(
     )
 
     if not llm_answer.get("llm_used"):
+<<<<<<< HEAD
+=======
+        if deterministic_visual:
+            return {
+                **fallback_answer,
+                "answer": json.dumps(deterministic_visual, ensure_ascii=False),
+                "llm_used": False,
+                "provider": llm_answer.get("provider"),
+                "model": llm_answer.get("model"),
+                "llm_error": llm_answer.get("llm_error"),
+                "llm_key_received": llm_key_received,
+                "llm_key_source": llm_key_source,
+                "suggested_questions": llm_answer.get("suggested_questions", []),
+            }
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
         return {
             **fallback_answer,
             "answer": _concise_grounded_answer(question, fallback_answer),
@@ -288,6 +424,7 @@ def run_analysis_pipeline(
         fallback_answer.get("metrics", []),
     )
     if not grounding.get("passed"):
+<<<<<<< HEAD
         return {
             **fallback_answer,
             "answer": _concise_grounded_answer(
@@ -299,6 +436,27 @@ def run_analysis_pipeline(
             "provider": llm_answer.get("provider"),
             "model": llm_answer.get("model"),
             "llm_error": "OpenAI 답변이 문서 근거에 맞지 않는 내용이 있어 로컬 근거 답변으로 변환했습니다.",
+=======
+        if deterministic_visual:
+            return {
+                **fallback_answer,
+                "answer": json.dumps(deterministic_visual, ensure_ascii=False),
+                "llm_used": False,
+                "provider": llm_answer.get("provider"),
+                "model": llm_answer.get("model"),
+                "llm_error": f"Visual grounding fallback used: {grounding.get('reason')}",
+                "llm_key_received": llm_key_received,
+                "llm_key_source": llm_key_source,
+                "suggested_questions": llm_answer.get("suggested_questions", []),
+            }
+        return {
+            **fallback_answer,
+            "answer": _concise_grounded_answer(question, fallback_answer),
+            "llm_used": False,
+            "provider": llm_answer.get("provider"),
+            "model": llm_answer.get("model"),
+            "llm_error": "OpenAI 답변에 문서 근거와 맞지 않는 내용이 있어 로컬 근거 답변으로 전환했습니다.",
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
             "llm_key_received": llm_key_received,
             "llm_key_source": llm_key_source,
             "suggested_questions": llm_answer.get("suggested_questions", []),

@@ -14,6 +14,10 @@ from typing import Iterable
 from xml.etree import ElementTree
 
 from ..core.config import settings
+<<<<<<< HEAD
+=======
+from .topic_modeling import extract_topics
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
 
 # 이 파일은 AI가 직접 동작하는 곳이 아니라, AI에 넣을 텍스트를 준비하는 전처리 서비스입니다.
 # 파일 형식별로 본문 텍스트를 추출하고, OpenAI 키가 없을 때 쓸 기본 분석 결과도 만듭니다.
@@ -32,6 +36,13 @@ EXTRACTION_NOISE_PATTERN = re.compile(r"[\u0100-\u024f\u3400-\u4dbf\u4e00-\u9fff
 IMAGE_META_PATTERNS = (
     re.compile(r"원본\s*그림의\s*이름\s*:\s*CLP[^\s]+", re.IGNORECASE),
     re.compile(r"원본\s*그림의\s*크기\s*:\s*가로\s*\d+\s*pixel\s*,?\s*세로\s*\d+\s*pixel", re.IGNORECASE),
+<<<<<<< HEAD
+=======
+    re.compile(r"그림\s*입니다\.?", re.IGNORECASE),
+    re.compile(r"이미지\s*입니다\.?", re.IGNORECASE),
+    re.compile(r"binaryitemid\s*[:=]\s*[^\s]+", re.IGNORECASE),
+    re.compile(r"href\s*[:=]\s*[^\s]+", re.IGNORECASE),
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
 )
 FORMULA_NOISE_PATTERN = re.compile(
     r"\{[^{}]{0,100}(?:TIMES|over)[^{}]{0,220}\}|(?:TIMES|over)\s*`?\s*1,?0{2,}",
@@ -809,6 +820,137 @@ def _extractive_summary(text: str, question: str = "", limit: int = 4) -> list[s
 # --- HWPX / HWP 파싱 보조 함수들 (PoC) -----------------------------
 # 이 영역은 HWPX와 HWP 문서에서 텍스트/이미지를 추출하는 전용 파서 로직입니다.
 # HWPX는 Zip+XML 기반 포맷이고, HWP는 구형 한글 바이너리 포맷이므로 각각 다른 접근을 사용합니다.
+<<<<<<< HEAD
+=======
+def _local_name(tag: str) -> str:
+    return str(tag or "").split("}", 1)[-1].split(":", 1)[-1].lower()
+
+
+def _is_hwpx_body_xml(name: str) -> bool:
+    lower = name.lower().replace("\\", "/")
+    if not lower.endswith(".xml"):
+        return False
+    if lower.startswith(("settings/", "meta-inf/", "preview/", "docinfo")):
+        return False
+    return (
+        "/section" in lower
+        or lower.startswith("contents/section")
+        or lower.startswith("contents/body")
+        or lower.startswith("bodytext/")
+    )
+
+
+def _clean_hwpx_block(text: str) -> str:
+    cleaned = _clean_text(text)
+    cleaned = re.sub(r"\b(?:charpridref|parapridref|styleidref|borderfillidref)\b\s*\d*", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(?:instid|zorder|numberingtype|textwrap|lock)\b\s*[:=]?\s*[A-Za-z0-9_-]+", " ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _node_text(node) -> str:
+    return _clean_hwpx_block(" ".join(part for part in node.itertext() if part and part.strip()))
+
+
+def _paragraph_text(node) -> str:
+    parts: list[str] = []
+    for child in node.iter():
+        name = _local_name(child.tag)
+        if name in {"t", "text"} and child.text:
+            parts.append(child.text)
+        elif name in {"linebreak", "br"}:
+            parts.append("\n")
+        elif name in {"tab"}:
+            parts.append("\t")
+        elif name in {"pic", "image", "drawing", "ole"}:
+            parts.append(" [그림] ")
+    text = "".join(parts).strip()
+    return _clean_hwpx_block(text or _node_text(node))
+
+
+def _table_rows(node) -> list[list[str]]:
+    rows: list[list[str]] = []
+    for row in node.iter():
+        if _local_name(row.tag) not in {"tr", "row"}:
+            continue
+        cells: list[str] = []
+        for cell in row:
+            if _local_name(cell.tag) not in {"tc", "cell"}:
+                continue
+            cell_text = _node_text(cell)
+            if cell_text:
+                cells.append(cell_text)
+        if cells:
+            rows.append(cells)
+    return rows
+
+
+def _format_table(rows: list[list[str]], table_index: int) -> str:
+    if not rows:
+        return ""
+    lines = [f"[표 {table_index}]"]
+    for row in rows[:80]:
+        lines.append(" | ".join(cell for cell in row if cell))
+    return "\n".join(lines)
+
+
+def _is_inside(node, ancestor_names: set[str], parent_map: dict) -> bool:
+    parent = parent_map.get(node)
+    while parent is not None:
+        if _local_name(parent.tag) in ancestor_names:
+            return True
+        parent = parent_map.get(parent)
+    return False
+
+
+def _parse_hwpx_body_xml(raw: bytes) -> list[str]:
+    try:
+        root = ElementTree.fromstring(raw)
+    except Exception:
+        return []
+
+    parent_map = {child: parent for parent in root.iter() for child in parent}
+    blocks: list[str] = []
+    table_index = 1
+
+    for node in root.iter():
+        name = _local_name(node.tag)
+        if name in {"tbl", "table"}:
+            table_text = _format_table(_table_rows(node), table_index)
+            if table_text:
+                blocks.append(table_text)
+                table_index += 1
+            continue
+
+        if name in {"pic", "image", "drawing", "ole"} and not _is_inside(node, {"p", "para", "tbl", "table"}, parent_map):
+            blocks.append("[그림]")
+            continue
+
+        if name not in {"p", "para"}:
+            continue
+        if _is_inside(node, {"tbl", "table"}, parent_map):
+            continue
+        paragraph = _paragraph_text(node)
+        if paragraph and paragraph != "[그림]":
+            blocks.append(paragraph)
+        elif paragraph == "[그림]":
+            blocks.append("[그림]")
+
+    cleaned_blocks: list[str] = []
+    seen = set()
+    for block in blocks:
+        block = block.strip()
+        compact = re.sub(r"\s+", "", block)
+        if not block or compact in seen:
+            continue
+        if len(compact) <= 1:
+            continue
+        seen.add(compact)
+        cleaned_blocks.append(block)
+    return cleaned_blocks
+
+
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
 def _parse_hwpx_bytes(data: bytes) -> tuple[str, list[dict]]:
     """HWPX(Zip+XML) 포맷을 안전하게 파싱합니다.
 
@@ -816,12 +958,17 @@ def _parse_hwpx_bytes(data: bytes) -> tuple[str, list[dict]]:
     - text: 문서에서 추출한 텍스트(간단 정리)
     - images: [{'name': str, 'bytes': bytes}] 형태의 추출된 이미지들
     """
+<<<<<<< HEAD
     texts = []
+=======
+    blocks = []
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
     images = []
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             for name in z.namelist():
                 lname = name.lower()
+<<<<<<< HEAD
                 # XML 파일에서 텍스트 수집
                 if lname.endswith('.xml'):
                     try:
@@ -834,6 +981,12 @@ def _parse_hwpx_bytes(data: bytes) -> tuple[str, list[dict]]:
                             continue
                         # 모든 텍스트 노드 합치기
                         texts.append(' '.join(t for t in root.itertext() if t and t.strip()))
+=======
+                # 본문 XML만 문단/표/그림 단위로 수집합니다.
+                if _is_hwpx_body_xml(name):
+                    try:
+                        blocks.extend(_parse_hwpx_body_xml(z.read(name)))
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
                     except KeyError:
                         continue
 
@@ -847,7 +1000,30 @@ def _parse_hwpx_bytes(data: bytes) -> tuple[str, list[dict]]:
     except zipfile.BadZipFile:
         return "", []
 
+<<<<<<< HEAD
     combined = '\n'.join(_clean_text(t) for t in texts if t)
+=======
+    if not blocks:
+        # 일부 HWPX 변형은 본문 경로가 다를 수 있어, 마지막 fallback으로 XML 텍스트를 읽되
+        # settings/docInfo/metadata 계열은 제외합니다.
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as z:
+                for name in z.namelist():
+                    lname = name.lower().replace("\\", "/")
+                    if not lname.endswith(".xml") or lname.startswith(("settings/", "meta-inf/", "docinfo")):
+                        continue
+                    try:
+                        root = ElementTree.fromstring(z.read(name))
+                    except Exception:
+                        continue
+                    text = _node_text(root)
+                    if text:
+                        blocks.append(text)
+        except zipfile.BadZipFile:
+            return "", images
+
+    combined = '\n\n'.join(block for block in blocks if block)
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
     return combined, images
 
 
@@ -1232,11 +1408,21 @@ def extract_file_document(filename: str, content: bytes) -> dict:
         return _document_from_units(filename, "PDF", extract_pdf_units(content))
     if extension == ".hwpx":
         parsed = parse_document(content, filename)
+<<<<<<< HEAD
+=======
+        raw_text = parsed.get("text", "")
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
         text = _parsed_text_or_message(
             parsed,
             "HWPX/OWPML 내부에서 추출 가능한 본문 텍스트를 찾지 못했습니다.",
         )
+<<<<<<< HEAD
         return _document_from_units(filename, "HWPX/OWPML", [{"section_index": 1, "text": text}])
+=======
+        document = _document_from_units(filename, "HWPX/OWPML", [{"section_index": 1, "text": text}])
+        document["preview_text"] = raw_text or text
+        return document
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
     if extension == ".docx":
         return _document_from_units(filename, "DOCX", [{"section_index": 1, "text": extract_docx(content)}])
     if extension in TEXT_EXTENSIONS:
@@ -1245,10 +1431,20 @@ def extract_file_document(filename: str, content: bytes) -> dict:
         return _document_from_units(filename, "IMAGE", [{"section_index": 1, "text": inspect_image(content)}])
     if extension == ".hwp":
         parsed = parse_document(content, filename)
+<<<<<<< HEAD
         text = _parsed_text_or_message(parsed, "")
         if not text:
             text = extract_hwp(content)
         return _document_from_units(filename, "HWP", [{"section_index": 1, "text": text}])
+=======
+        raw_text = parsed.get("text", "")
+        text = _parsed_text_or_message(parsed, "")
+        if not text:
+            text = extract_hwp(content)
+        document = _document_from_units(filename, "HWP", [{"section_index": 1, "text": text}])
+        document["preview_text"] = raw_text or text
+        return document
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
     return _document_from_units(filename, "UNKNOWN", [{"section_index": 1, "text": "지원하지 않는 파일 형식입니다."}])
 
 
@@ -1286,6 +1482,7 @@ def _legacy_extract_file_text(filename: str, content: bytes) -> tuple[str, str]:
 # OpenAI API가 없거나 실패했을 때도 답변을 만들기 위한 기본 분석 함수입니다.
 # 진짜 LLM이 아니라, 위에서 추출한 텍스트에서 중요 문장/키워드를 규칙 기반으로 뽑습니다.
 def build_analysis_answer(question: str, extracted_docs: list[dict]) -> dict:
+<<<<<<< HEAD
     # [CRITICAL FIX] 불필요한 로컬 1차 분석을 완전히 꺼달라는 사용자 요청에 따라,
     # 키워드 추출, 문장 요약, 수치 검색 등의 무거운 로컬 연산을 모두 해제하고 빈 껍데기만 즉시 반환합니다.
     # 이제 로컬 서버는 오직 파일 해독 역할만 하며, 모든 문해력과 분석은 GPT 전담으로 돌아갑니다.
@@ -1298,6 +1495,131 @@ def build_analysis_answer(question: str, extracted_docs: list[dict]) -> dict:
         "topics": [],
         "documents": [],
         "relevant_chunks": [],
+=======
+    combined_text = "\n".join(doc["text"] for doc in extracted_docs if doc["text"])
+    intent = _question_intent(question)
+    relevant_chunks = rank_relevant_chunks(question, extracted_docs, 6)
+    relevant_text = "\n".join(chunk["text"] for chunk in relevant_chunks) or combined_text
+    highlights = _top_sentences(relevant_text, 10, question)
+    summary_points = _extractive_summary(relevant_text, question, 4)
+    terms = _frequent_terms(combined_text)
+    metrics = _metric_candidates(combined_text)
+    topics = extract_topics(combined_text)
+
+    if not combined_text.strip():
+        summary = (
+            "업로드 파일은 받았지만 추출 가능한 본문 텍스트가 거의 없습니다. "
+            "이미지라면 OCR 설치가 필요할 수 있고, 구형 HWP는 HWPX 변환이 더 안정적입니다."
+        )
+    else:
+        summary = " ".join(summary_points) or combined_text[:600]
+
+    comparison = [_doc_brief(doc) for doc in extracted_docs]
+    keyword_sets = {item["filename"]: set(item["keywords"]) for item in comparison}
+
+    answer_lines = [
+        _intent_intro(question, intent),
+        "",
+        "LLM 없이 로컬 기본 분석으로 처리했습니다.",
+        f"분석 기준: {_intent_label(intent)}",
+        "",
+        "[핵심 내용 요약]",
+    ]
+
+    if summary_points:
+        answer_lines.extend(f"{index}. {point}" for index, point in enumerate(summary_points, start=1))
+    else:
+        answer_lines.append(summary)
+
+    answer_lines.extend([
+        "",
+        "[중요 문장 발췌]",
+    ])
+
+    if highlights:
+        answer_lines.extend(f"- {sentence}" for sentence in highlights[:8])
+    else:
+        answer_lines.append("- 발췌할 문장을 찾지 못했습니다.")
+
+    answer_lines.extend([
+        "",
+        "[중요 키워드]",
+        ", ".join(terms) if terms else "키워드를 추출할 텍스트가 부족합니다.",
+        "",
+        "[실험 결과/수치 후보]",
+    ])
+
+    if metrics:
+        answer_lines.extend(f"- {metric}" for metric in metrics)
+    else:
+        answer_lines.append("- 정확도, F1, AUC, % 등으로 표시된 실험 수치 후보를 찾지 못했습니다.")
+
+    if topics:
+        answer_lines.extend(["", "[문서 주제 후보]"])
+        for topic in topics[:5]:
+            keywords = ", ".join(topic.get("keywords", [])[:5]) or topic.get("label", "주제")
+            example = topic.get("examples", [""])[0] if topic.get("examples") else ""
+            answer_lines.append(f"- {topic.get('label', '주제')}: {keywords}")
+            if example:
+                answer_lines.append(f"  · 근거 문장: {example[:180]}")
+
+    if relevant_chunks:
+        answer_lines.extend([
+            "",
+            "[질문 관련 문서 구간]",
+        ])
+        for chunk in relevant_chunks[:4]:
+            focused = _top_sentences(chunk["text"], 1, question)
+            preview = (focused[0] if focused else _clean_text(chunk["text"]))[:260]
+            source_label = chunk.get("source_label") or f"Chunk {chunk['chunk_index']}"
+            answer_lines.append(
+                f"- {chunk['filename']} {source_label} "
+                f"(관련도 {chunk['score']}): {preview}"
+            )
+
+    answer_lines.extend([
+        "",
+        "[문서별 핵심 발췌]",
+    ])
+
+    for item in comparison:
+        answer_lines.append(f"- {item['filename']} ({item['format']})")
+        answer_lines.extend(f"  · {point}" for point in item["key_points"][:4])
+        if item["metrics"]:
+            answer_lines.append(f"  · 수치 후보: {' / '.join(item['metrics'])}")
+        if item["keywords"]:
+            answer_lines.append(f"  · 키워드: {', '.join(item['keywords'][:6])}")
+
+    if len(comparison) >= 2:
+        answer_lines.extend(["", "[문서 간 차이점 후보]"])
+        for item in comparison:
+            other_terms = set().union(
+                *(terms for filename, terms in keyword_sets.items() if filename != item["filename"])
+            )
+            unique_terms = [term for term in item["keywords"] if term not in other_terms]
+            answer_lines.append(
+                f"- {item['filename']}: {', '.join(unique_terms[:5]) if unique_terms else '다른 문서와 겹치는 키워드가 많습니다.'}"
+            )
+
+    if question:
+        matched = _top_sentences(combined_text, 4, question)
+        answer_lines.extend(["", "[질문 반영 답변]"])
+        if matched:
+            answer_lines.append(f"'{question}' 관점에서 가장 가까운 근거 문장은 아래와 같습니다.")
+            answer_lines.extend(f"- {sentence}" for sentence in matched)
+        else:
+            answer_lines.append(f"'{question}'와 직접 연결되는 문장을 찾지 못해 전체 요약을 우선 제공했습니다.")
+
+    return {
+        "answer": "\n".join(answer_lines),
+        "summary": summary,
+        "intent": intent,
+        "keywords": terms,
+        "metrics": metrics,
+        "topics": topics,
+        "documents": comparison,
+        "relevant_chunks": relevant_chunks,
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
     }
 
 

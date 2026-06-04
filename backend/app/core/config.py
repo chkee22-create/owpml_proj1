@@ -166,7 +166,11 @@ def create_settings() -> Settings:
         java_bin=os.getenv("JAVA_BIN", "java").strip() or "java",
         hwp_parser_timeout_seconds=_env_int("HWP_PARSER_TIMEOUT_SECONDS", 30),
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
+<<<<<<< HEAD
         openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip(),
+=======
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip(),
+>>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
         google_api_key=os.getenv("GOOGLE_API_KEY", "").strip(),
         google_client_id=(os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID", "")).strip(),
         gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
