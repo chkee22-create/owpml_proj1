@@ -15,9 +15,8 @@ export const MainLayout = styled.div`
 `;
 
 export const VisualPanel = styled.div`
-  flex: 0 0 30%;
-  min-width: 300px;
-  max-width: 420px;
+  flex: 0 0 clamp(420px, 46%, 720px);
+  min-width: 420px;
   border-right: 1px solid #e2e8f0;
   padding: 12px;
   overflow: hidden;
@@ -34,7 +33,7 @@ export const VisualPanel = styled.div`
 
   .compare-shell {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(260px, var(--source-pane-width, 58%)) 10px minmax(220px, 1fr);
     gap: 8px;
     min-height: 0;
     height: 100%;
@@ -54,11 +53,6 @@ export const VisualPanel = styled.div`
     border-radius: 8px;
     background: #ffffff;
     overflow: hidden;
-  }
-
-  .source-pane,
-  .pane-resizer {
-    display: none;
   }
 
   .panel-head {
@@ -90,6 +84,8 @@ export const VisualPanel = styled.div`
     cursor: col-resize;
     border-radius: 8px;
     background: transparent;
+    touch-action: none;
+    z-index: 2;
   }
 
   .pane-resizer::before {
@@ -111,36 +107,68 @@ export const VisualPanel = styled.div`
     background: #0ea5a4;
   }
 
-  .source-tabs {
+  .resize-shield {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    cursor: col-resize;
+    background: transparent;
+    touch-action: none;
+  }
+
+  .source-file-list {
     display: flex;
+    flex-direction: column;
     gap: 6px;
     padding: 8px;
     border-bottom: 1px solid #e2e8f0;
-    overflow-x: auto;
+    flex: 0 0 auto;
+    max-height: 118px;
+    overflow-y: auto;
     background: #f8fafc;
+    scrollbar-gutter: stable;
   }
 
-  .source-tabs button {
-    max-width: 150px;
-    min-height: 30px;
+  .source-file-item {
+    width: 100%;
+    min-width: 0;
+    min-height: 34px;
     border: 1px solid #cbd5e1;
-    border-radius: 6px;
+    border-radius: 8px;
     background: #ffffff;
     color: #475569;
-    padding: 0 10px;
-    font-size: 11px;
+    padding: 0 6px 0 10px;
+    font-size: 12px;
     font-weight: 800;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     cursor: pointer;
-    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
   }
 
-  .source-tabs button.active {
+  .source-file-item:hover,
+  .source-file-item.active {
     border-color: #0ea5a4;
     background: #f0fdfa;
     color: #0f766e;
+  }
+
+  .source-file-item > svg {
+    width: 15px;
+    height: 15px;
+    color: #0ea5a4;
+    flex: 0 0 auto;
+  }
+
+  .source-file-item > span:not(.source-file-remove) {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .source-preview {
@@ -256,16 +284,55 @@ export const VisualPanel = styled.div`
     font-weight: 750;
     line-height: 1.45;
 
-    strong {
-      display: block;
-      margin-bottom: 4px;
-      color: #0f172a;
-      font-size: 12.5px;
+    &.expanded {
+      background: #f8fafc;
     }
 
-    span {
+    .asset-title-button {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    strong {
+      display: block;
+      color: #0f172a;
+      font-size: 12.5px;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    > span {
+      display: block;
+      margin-top: 4px;
       color: #94a3b8;
       font-size: 11px;
+    }
+
+    .toggle-indicator {
+      flex: 0 0 auto;
+      color: #0ea5a4;
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .artifact-head {
+      padding: 12px 14px;
+    }
+
+    .artifact-body {
+      padding: 12px;
     }
   }
 
@@ -295,6 +362,15 @@ export const VisualArtifact = styled.div`
   overflow: hidden;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
 
+  &.is-clickable .artifact-body {
+    cursor: zoom-in;
+  }
+
+  &.is-clickable .artifact-body:focus {
+    outline: 3px solid rgba(14, 165, 164, 0.22);
+    outline-offset: -3px;
+  }
+
   .artifact-head {
     display: flex;
     align-items: center;
@@ -311,11 +387,25 @@ export const VisualArtifact = styled.div`
       font-weight: 850;
     }
 
-    span {
+    .artifact-meta {
       flex: 0 0 auto;
+      display: grid;
+      justify-items: end;
+      gap: 3px;
+      min-width: fit-content;
+    }
+
+    span {
       color: #0ea5a4;
       font-size: 11px;
       font-weight: 850;
+    }
+
+    time {
+      color: #64748b;
+      font-size: 10.5px;
+      font-weight: 800;
+      white-space: nowrap;
     }
   }
 
@@ -353,6 +443,24 @@ export const VisualArtifact = styled.div`
   }
 
   &.is-modal {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+
+    .artifact-body {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .dynamic-visualizer {
+      min-height: 420px !important;
+    }
+
+    .recharts-responsive-container {
+      height: 420px !important;
+    }
+
     .save-container {
       display: flex;
       justify-content: flex-end;
@@ -581,89 +689,6 @@ export const VisualArtifact = styled.div`
     }
   }
 
-  .mini-mindmap {
-    position: relative;
-    min-height: 230px;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 22px;
-    display: grid;
-    grid-template-columns: minmax(120px, 0.8fr) minmax(190px, 1.4fr);
-    gap: 30px;
-    align-items: center;
-    background:
-      radial-gradient(circle at 18% 50%, rgba(14, 165, 164, 0.12), transparent 28%),
-      #ffffff;
-
-    .center-node {
-      position: relative;
-      z-index: 2;
-      min-height: 96px;
-      border-radius: 50%;
-      background: #0ea5a4;
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 14px;
-      font-size: 13px;
-      font-weight: 900;
-      box-shadow: 0 12px 22px rgba(14, 165, 164, 0.22);
-    }
-
-    .tree-trunk {
-      position: absolute;
-      left: 34%;
-      top: 50%;
-      width: 16%;
-      height: 3px;
-      background: #94a3b8;
-      transform: translateY(-50%);
-      border-radius: 999px;
-    }
-
-    .branches {
-      position: relative;
-      z-index: 1;
-      display: grid;
-      gap: 10px;
-
-      &::before {
-        content: '';
-        position: absolute;
-        left: -17px;
-        top: 16px;
-        bottom: 16px;
-        width: 3px;
-        background: #94a3b8;
-        border-radius: 999px;
-      }
-    }
-
-    .branches span {
-      position: relative;
-      border: 1px solid #cbd5e1;
-      border-left: 5px solid #2563eb;
-      border-radius: 8px;
-      padding: 8px 10px;
-      color: #334155;
-      font-size: 12px;
-      font-weight: 800;
-      background: #f8fafc;
-      line-height: 1.35;
-
-      &::before {
-        content: '';
-        position: absolute;
-        left: -20px;
-        top: 50%;
-        width: 20px;
-        height: 2px;
-        background: #94a3b8;
-      }
-    }
-  }
 `;
 
 export const InviteCodePill = styled.button`
@@ -759,12 +784,12 @@ export const SaveInlinePanel = styled.div`
 
 export const PreviewModalContainer = styled.div`
   width: 90%;
-  max-width: 900px;
-  max-height: 90vh;
+  max-width: 1120px;
+  height: min(760px, calc(100vh - 48px));
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.2);
-  overflow-y: auto;
+  overflow: hidden;
   
   /* 뷰어 내부 스타일 조정 (기존 VisualArtifact 디자인을 상속하되 더 넓게) */
   .artifact-head {
@@ -775,12 +800,12 @@ export const PreviewModalContainer = styled.div`
   }
 
   .artifact-body {
-    padding: 24px;
+    padding: 24px 28px;
   }
 
   .artifact-desc {
     font-size: 15px;
-    margin-bottom: 24px;
+    margin-bottom: 18px;
   }
 `;
 

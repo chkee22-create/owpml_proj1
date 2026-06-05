@@ -172,42 +172,6 @@ export const TopMenuBar = styled.div`
   .actions { 
     display: flex; gap: 8px; align-items: center;
 
-    .api-key-box {
-      height: 36px;
-      min-width: 210px;
-      border: 1px solid #bfdbfe;
-      border-radius: 6px;
-      background: #f8fbff;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 0 9px;
-      box-sizing: border-box;
-
-      i {
-        color: #2563eb;
-        font-size: 12px;
-      }
-
-      select {
-        height: 24px;
-        border: 1px solid #dbeafe;
-        border-radius: 5px;
-        background: #ffffff;
-        color: #2563eb;
-        font-size: 11px;
-        font-weight: 850;
-        outline: none;
-      }
-
-      .server-key-note {
-        color: #64748b;
-        font-size: 12px;
-        font-weight: 750;
-        white-space: nowrap;
-      }
-    }
-
     button { 
       background: #ffffff;              /* 💡 버튼 배경을 흰색으로 전환하여 더 정갈하게 변경 */
       border: 1px solid #cbd5e1; 
@@ -218,6 +182,21 @@ export const TopMenuBar = styled.div`
       
       &:hover { background: #f8fafc; color: #1e293b; border-color: #94a3b8; }
     } 
+
+    .icon-action {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 36px;
+
+      svg {
+        width: 17px;
+        height: 17px;
+      }
+    }
 
     .danger {
       border-color: #e74c3c;
@@ -239,9 +218,11 @@ export const TopMenuBar = styled.div`
         min-width: 120px;
       }
 
-      .api-key-box {
-        width: 100%;
+      .icon-action {
+        flex: 0 0 36px;
+        min-width: 36px;
       }
+
     }
   }
 `;
@@ -292,9 +273,137 @@ export const InviteCodeBadge = styled.div`
 export const StreamMessageArea = styled.div`
   flex: 1; padding: 40px 60px;          /* 💡 좌우 여백을 60px로 넓혀서 논문 읽을 때 시야가 답답하지 않게 가로폭 확장 */
   overflow-y: auto; display: flex; flex-direction: column; gap: 28px;
+  position: relative;
+
+  .message-anchor {
+    scroll-margin: 96px;
+  }
+
+  .question-timeline {
+    position: fixed;
+    top: 50%;
+    right: 18px;
+    transform: translateY(-50%);
+    width: 34px;
+    max-height: min(360px, calc(100vh - 260px));
+    padding: 8px 5px;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 60;
+    transition: width 0.18s ease, padding 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .question-timeline:hover,
+  .question-timeline:focus-within {
+    width: 300px;
+    padding: 10px;
+    border-color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 16px 38px rgba(15, 23, 42, 0.18);
+    overflow-y: auto;
+  }
+
+  .question-timeline button {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #475569;
+    padding: 0;
+    min-height: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .question-timeline button::before {
+    content: "";
+    width: 24px;
+    height: 3px;
+    border-radius: 999px;
+    background: #cbd5e1;
+    transition: background 0.15s ease, width 0.15s ease;
+  }
+
+  .question-timeline button:hover::before {
+    width: 28px;
+    background: #0f172a;
+  }
+
+  .question-timeline:hover button,
+  .question-timeline:focus-within button {
+    min-height: 38px;
+    padding: 9px 10px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    justify-content: stretch;
+    gap: 8px;
+    text-align: left;
+  }
+
+  .question-timeline:hover button::before,
+  .question-timeline:focus-within button::before {
+    display: none;
+  }
+
+  .question-timeline button:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+
+  .question-timeline span {
+    display: none;
+    color: #0ea5a4;
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .question-timeline strong {
+    display: none;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: inherit;
+    font-size: 12.5px;
+    font-weight: 750;
+  }
+
+  .question-timeline:hover span,
+  .question-timeline:hover strong,
+  .question-timeline:focus-within span,
+  .question-timeline:focus-within strong {
+    display: block;
+  }
 
   @media (max-width: 900px) {
     padding: 28px 32px;
+
+    .question-timeline {
+      top: auto;
+      right: 18px;
+      bottom: 92px;
+      transform: none;
+      width: 34px;
+      max-height: min(260px, calc(100vh - 180px));
+      display: flex;
+      overflow: hidden;
+    }
+
+    .question-timeline:hover,
+    .question-timeline:focus-within {
+      width: min(300px, calc(100vw - 36px));
+      overflow-y: auto;
+    }
   }
 
   @media (max-width: 560px) {
@@ -614,9 +723,12 @@ export const BottomPromptInput = styled.div`
     box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
   }
 
-  .file-island > i {
+  .file-island > i,
+  .file-island > svg {
     color: #0ea5a4;
     font-size: 13px;
+    width: 14px;
+    height: 14px;
     flex: 0 0 auto;
   }
 
@@ -657,6 +769,7 @@ export const BottomPromptInput = styled.div`
     border: 2px solid #e2e8f0;          /* 💡 채팅창과 똑같은 2px 선명한 경계선으로 수정 */
     border-radius: 14px; padding: 6px 18px;
     transition: border-color 0.15s;
+    position: relative;
     
     &:focus-within { border-color: #64748b; } /* 💡 마우스 클릭 시 테두리 색상 부드럽게 점등 */
     
@@ -677,10 +790,15 @@ export const BottomPromptInput = styled.div`
       cursor: pointer;
     }
 
+    .clip-menu-wrap {
+      position: relative;
+      flex: 0 0 auto;
+      margin-right: 8px;
+    }
+
     .clip-upload {
       width: 34px;
       height: 34px;
-      margin-right: 8px;
       border-radius: 9px;
       color: #64748b;
       flex: 0 0 auto;
@@ -689,6 +807,79 @@ export const BottomPromptInput = styled.div`
         background: #f1f5f9;
         color: #0ea5a4;
       }
+
+      &.active {
+        background: #f1f5f9;
+        color: #0f766e;
+      }
+
+      svg {
+        width: 19px;
+        height: 19px;
+        transition: transform 0.22s ease;
+      }
+
+      &.active svg {
+        transform: rotate(180deg);
+      }
+    }
+
+    .clip-action-menu {
+      position: absolute;
+      left: 0;
+      bottom: calc(100% + 14px);
+      z-index: 40;
+      width: 236px;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background: #ffffff;
+      box-shadow: 0 20px 44px rgba(15, 23, 42, 0.16);
+      display: grid;
+      gap: 4px;
+    }
+
+    .clip-action-menu button {
+      width: 100%;
+      min-height: 42px;
+      padding: 0 10px;
+      border-radius: 8px;
+      color: #1f2937;
+      display: flex;
+      justify-content: flex-start;
+      gap: 12px;
+      font-size: 13px;
+      font-weight: 750;
+
+      &:hover {
+        background: #f8fafc;
+        color: #0f766e;
+      }
+    }
+
+    .clip-action-menu .primary-action {
+      min-height: 44px;
+      font-size: 15px;
+    }
+
+    .clip-menu-divider {
+      height: 1px;
+      margin: 6px 2px;
+      background: #e2e8f0;
+    }
+
+    .clip-action-menu svg {
+      width: 19px;
+      height: 19px;
+      color: currentColor;
+      flex: 0 0 auto;
+    }
+
+    .clip-action-menu span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     i { 
@@ -708,6 +899,10 @@ export const BottomPromptInput = styled.div`
     .input-wrapper {
       border-radius: 12px;
       padding: 6px 12px;
+    }
+
+    .input-wrapper .clip-action-menu {
+      width: min(236px, calc(100vw - 42px));
     }
   }
 `;
