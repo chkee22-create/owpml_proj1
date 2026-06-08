@@ -117,9 +117,8 @@ export const VisualPanel = styled.div`
   }
 
   .source-file-list {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: calc((100% - 12px) / 3);
+    display: flex;
+    flex-wrap: nowrap;
     gap: 6px;
     padding: 8px 10px 10px;
     border-bottom: 1px solid #e2e8f0;
@@ -133,9 +132,10 @@ export const VisualPanel = styled.div`
   }
 
   .source-file-item {
-    width: 100%;
-    min-width: 0;
-    height: 28px;
+    flex: 0 0 calc((100% - 12px) / 3);
+    min-width: 92px;
+    max-width: calc((100% - 12px) / 3);
+    min-height: 36px;
     border: 1px solid #cbd5e1;
     border-radius: 7px;
     background: #ffffff;
@@ -170,8 +170,12 @@ export const VisualPanel = styled.div`
     min-width: 0;
     flex: 1;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.25;
+    white-space: normal;
+    word-break: break-all;
   }
 
   .source-preview {
