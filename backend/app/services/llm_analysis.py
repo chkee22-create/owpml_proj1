@@ -498,10 +498,16 @@ def _analyze_with_openai(
 def analyze_with_llm(
     question: str,
     extracted_docs: list[dict],
+    provider: str = "openai",
     openai_api_key: str | None = None,
+    google_api_key: str | None = None,
     analysis_text: str = "",
     relevant_chunks: list[dict] | None = None,
 ) -> dict:
+    provider = (provider or "openai").lower()
+    if provider != "openai":
+        provider = "openai"
+
     api_key = openai_api_key or settings.openai_api_key
     if not api_key:
         return _llm_error("OpenAI API 키가 없어 기본 문서 추출로 응답했습니다.", "openai")
