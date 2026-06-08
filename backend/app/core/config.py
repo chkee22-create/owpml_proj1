@@ -106,7 +106,10 @@ class Settings:
     hwp_parser_timeout_seconds: int
     openai_api_key: str
     openai_model: str
+    google_api_key: str
     google_client_id: str
+    gemini_api_key: str
+    gemini_model: str
     enable_bert_grounding: bool
     bert_grounding_model: str
     bert_grounding_threshold: float
@@ -163,11 +166,12 @@ def create_settings() -> Settings:
         java_bin=os.getenv("JAVA_BIN", "java").strip() or "java",
         hwp_parser_timeout_seconds=_env_int("HWP_PARSER_TIMEOUT_SECONDS", 30),
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
-        openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip(),
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip(),
         google_api_key=os.getenv("GOOGLE_API_KEY", "").strip(),
- kim_v3
         google_client_id=(os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID", "")).strip(),
-        enable_bert_grounding=_env_bool("ENABLE_BERT_GROUNDING", True),
+        gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
+        gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip(),
+        enable_bert_grounding=_env_bool("ENABLE_BERT_GROUNDING", False),
         bert_grounding_model=os.getenv(
             "BERT_GROUNDING_MODEL",
             "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
@@ -178,7 +182,7 @@ def create_settings() -> Settings:
             "Given an answer sentence, retrieve the most relevant source passage from the uploaded document.",
         ).strip(),
         enable_topic_modeling=_env_bool("ENABLE_TOPIC_MODELING", True),
-        topic_model_backend=os.getenv("TOPIC_MODEL_BACKEND", "bertopic").strip().lower(),
+        topic_model_backend=os.getenv("TOPIC_MODEL_BACKEND", "local").strip().lower(),
         topic_model_limit=_env_int("TOPIC_MODEL_LIMIT", 5),
     )
     settings.validate()

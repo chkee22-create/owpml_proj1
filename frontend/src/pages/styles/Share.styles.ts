@@ -382,48 +382,17 @@ export const TimelineNode = styled.article<{ $active?: boolean }>`
     padding: 16px 18px;
   }
 
-<<<<<<< HEAD
-=======
-  .asset-head {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 8px;
-  }
-
->>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
   .project-label {
     color: #0ea5a4;
     font-size: 12px;
     font-weight: 800;
-<<<<<<< HEAD
     margin-bottom: 8px;
-=======
-    line-height: 1.35;
->>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
   }
 
   .project-label.support {
     color: #64748b;
   }
 
-<<<<<<< HEAD
-=======
-  .asset-timestamp {
-    flex: 0 0 auto;
-    border: 1px solid #dbe7f0;
-    border-radius: 999px;
-    background: #f8fafc;
-    color: #64748b;
-    padding: 4px 9px;
-    font-size: 11px;
-    font-weight: 850;
-    line-height: 1.2;
-    white-space: nowrap;
-  }
-
->>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
   h4 {
     margin: 0 0 6px 0;
     color: #0f172a;
@@ -435,11 +404,7 @@ export const TimelineNode = styled.article<{ $active?: boolean }>`
     color: #94a3b8;
     font-size: 11.5px;
     font-weight: 700;
-<<<<<<< HEAD
     margin-bottom: 10px;
-=======
-    margin-top: 10px;
->>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
   }
 
   .body {
@@ -723,18 +688,6 @@ export const TimelineNode = styled.article<{ $active?: boolean }>`
       padding: 14px;
     }
 
-<<<<<<< HEAD
-=======
-    .asset-head {
-      display: grid;
-      gap: 6px;
-    }
-
-    .asset-timestamp {
-      width: fit-content;
-    }
-
->>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
     h4 {
       font-size: 14px;
       line-height: 1.4;
@@ -878,43 +831,9 @@ export const RightCoopPanel = styled.aside<{ $error?: boolean }>`
     cursor: pointer;
   }
 
-<<<<<<< HEAD
   .invite-help {
     width: calc(100% - 64px);
     margin: 18px auto 8px auto;
-=======
-  .new-share-page-btn {
-    width: calc(100% - 64px);
-    max-width: 276px;
-    margin: 18px auto 10px auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    border: 1px solid #0f766e;
-    border-radius: 8px;
-    background: #0f766e;
-    color: #ffffff;
-    padding: 12px 10px;
-    font-size: 13px;
-    font-weight: 900;
-    cursor: pointer;
-    box-shadow: 0 10px 20px rgba(15, 118, 110, 0.16);
-  }
-
-  .new-share-page-btn:hover {
-    background: #115e59;
-    border-color: #115e59;
-  }
-
-  .new-share-page-btn i {
-    font-size: 12px;
-  }
-
-  .invite-help {
-    width: calc(100% - 64px);
-    margin: 0 auto 8px auto;
->>>>>>> 668b885c33dfb63e222feb660e03e2de50a9de10
     color: #92400e;
     font-size: 11.5px;
     font-weight: 800;
