@@ -2,7 +2,7 @@
 // TypeScript 변경 표시: 기존 JS 로직은 유지하면서 함수 인자와 화면 props에 실제 타입을 붙여 TypeScript 검사를 통과하게 했습니다.
 // 초보자 안내: 사용자가 실제로 보게 되는 한 화면 단위의 React 페이지 컴포넌트입니다.
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { FiBarChart2, FiFileText, FiGrid, FiImage, FiPaperclip, FiRefreshCcw } from 'react-icons/fi';
@@ -490,7 +490,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
   const [isClipMenuOpen, setIsClipMenuOpen] = useState(false);
 
   const currentInviteCode = currentProject?.inviteCode || restoredData?.inviteCode || '저장 후 생성';
-  const sourceFiles = activeFiles;
+  const sourceFiles = useMemo(() => mergeUniqueFiles(activeFiles, files), [activeFiles, files]);
   const selectedSourceFile = sourceFiles.find((file) => getFileKey(file) === selectedSourceKey) || sourceFiles[0];
 
   const cacheSourcePreview = (fileKey: string, preview: any) => {
