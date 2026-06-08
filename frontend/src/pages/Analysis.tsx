@@ -802,6 +802,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
     }
 
     setFiles(nextFiles);
+    setSelectedSourceKey(getFileKey(selectedFiles[0]));
     setPromptText((current) => (current.trim() ? current : '분석해 드릴까요?'));
     writeJson(getActiveAnalysisSessionKey(), {
       id: recentConversationIdRef.current,
@@ -1020,8 +1021,10 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
     const nextQuestion = overrideQuestion || promptText.trim();
     const newFiles = [...filesToSend];
     const activeUploadFiles = activeFiles.filter(isUploadableFile);
-    const requestFiles = newFiles.length > 0 ? newFiles.filter(isUploadableFile) : activeUploadFiles;
-    const pendingFiles = newFiles.length > 0 ? newFiles : [...activeFiles];
+    const pendingFiles = newFiles.length > 0 ? mergeUniqueFiles(activeFiles, newFiles) : [...activeFiles];
+    const requestFiles = newFiles.length > 0
+      ? mergeUniqueFiles(activeUploadFiles, newFiles.filter(isUploadableFile))
+      : activeUploadFiles;
     const hasNewUpload = newFiles.length > 0;
     if (!nextQuestion && pendingFiles.length === 0) {
       window.alert('질문을 입력하거나 파일을 선택해주세요.');
@@ -1032,7 +1035,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
     setPromptText('');
     if (hasNewUpload) {
       setActiveFiles(pendingFiles);
-      setSelectedSourceKey(getFileKey(pendingFiles[0]));
+      setSelectedSourceKey(getFileKey(newFiles[0]));
       setFiles([]);
     }
 
