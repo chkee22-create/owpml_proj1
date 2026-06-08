@@ -22,6 +22,13 @@ IMAGE_META_PATTERN = re.compile(
     re.IGNORECASE,
 )
 TABLE_HINT_PATTERN = re.compile(r"(?:^|\s)(?:표|table)\s*\d*|[│┃┌┐└┘├┤┬┴┼]", re.IGNORECASE)
+HWPX_PARAGRAPH_TAGS = {"p", "para"}
+HWPX_TABLE_TAGS = {"tbl", "table"}
+HWPX_IMAGE_TAGS = {"pic", "image", "img", "ole", "container", "shapeobject"}
+
+
+def _local_name(tag: str) -> str:
+    return str(tag or "").rsplit("}", 1)[-1].split(":")[-1].lower()
 
 
 def _clean_preview_line(text: str) -> str:
@@ -46,6 +53,51 @@ def _is_table_like(raw_line: str, cleaned_line: str) -> bool:
     if TABLE_HINT_PATTERN.search(cleaned_line):
         return True
     return raw_line.count("\t") >= 2 or raw_line.count("|") >= 2
+
+
+def _join_hwpx_texts(parts: list[str]) -> str:
+    tokens = [_clean_preview_line(part) for part in parts]
+    tokens = [token for token in tokens if token]
+    if not tokens:
+        return ""
+    text = " ".join(tokens)
+    text = re.sub(r"\s+([,.;:!?%)\]\}])", r"\1", text)
+    text = re.sub(r"([(\[\{])\s+", r"\1", text)
+    text = re.sub(r"\s+([~-])\s+", r"\1", text)
+    text = re.sub(r"\s{2,}", " ", text)
+    return text.strip()
+
+
+def _extract_hwpx_blocks(root: ElementTree.Element) -> list[str]:
+    blocks: list[str] = []
+    image_index = 0
+    table_index = 0
+
+    def walk(node: ElementTree.Element) -> None:
+        nonlocal image_index, table_index
+        name = _local_name(node.tag)
+
+        if name in HWPX_TABLE_TAGS:
+            table_index += 1
+            blocks.append(f"[표 {table_index}]")
+            return
+
+        if name in HWPX_IMAGE_TAGS:
+            image_index += 1
+            blocks.append(f"[이미지 {image_index}]")
+            return
+
+        if name in HWPX_PARAGRAPH_TAGS:
+            paragraph = _join_hwpx_texts([text for text in node.itertext() if text and text.strip()])
+            if paragraph:
+                blocks.append(paragraph)
+            return
+
+        for child in list(node):
+            walk(child)
+
+    walk(root)
+    return blocks
 
 
 def _structure_preview_text(text: str) -> str:
@@ -90,7 +142,8 @@ def _structure_preview_text(text: str) -> str:
 
 
 def _extract_hwpx_preview_text(content: bytes) -> str:
-    texts: list[str] = []
+    blocks: list[str] = []
+    fallback_texts: list[str] = []
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
             for name in archive.namelist():
@@ -103,12 +156,17 @@ def _extract_hwpx_preview_text(content: bytes) -> str:
                     root = ElementTree.fromstring(archive.read(name))
                 except ElementTree.ParseError:
                     continue
-                for node in root.iter():
-                    if node.text and node.text.strip():
-                        texts.append(node.text.strip())
+                extracted_blocks = _extract_hwpx_blocks(root)
+                if extracted_blocks:
+                    blocks.extend(extracted_blocks)
+                else:
+                    fallback_texts.append(_join_hwpx_texts([text for text in root.itertext() if text and text.strip()]))
     except Exception:
         return ""
-    return _structure_preview_text("\n".join(texts))
+
+    if not blocks:
+        blocks = [text for text in fallback_texts if text]
+    return _structure_preview_text("\n".join(blocks))
 
 
 def _extract_hwp_preview_text(content: bytes) -> str:
