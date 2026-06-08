@@ -924,6 +924,18 @@ def _parsed_text_or_message(parsed: dict, empty_message: str) -> str:
     return text or empty_message
 
 
+def _is_hwp_extraction_failure(text: str) -> bool:
+    return any(
+        message in str(text or "")
+        for message in (
+            "HWP 바이너리 문서는 olefile 패키지 또는 HWPX 변환이 필요합니다.",
+            "HWP 파일 구조를 열 수 없습니다.",
+            "HWP 본문 텍스트를 찾지 못했습니다.",
+            "HWP 본문 추출 중 오류가 발생했습니다.",
+        )
+    )
+
+
 def _finalize_extracted_text(text: str) -> str:
     """파일별 추출기가 반환한 텍스트를 분석용으로 최종 전처리합니다."""
 
@@ -1202,10 +1214,14 @@ def extract_file_document(filename: str, content: bytes) -> dict:
     if extension in IMAGE_EXTENSIONS:
         return _document_from_units(filename, "IMAGE", [{"section_index": 1, "text": inspect_image(content)}])
     if extension == ".hwp":
+        text = extract_hwp(content)
+        if text and not _is_hwp_extraction_failure(text):
+            return _document_from_units(filename, "HWP", [{"section_index": 1, "text": text}])
+
         parsed = parse_document(content, filename)
-        text = _parsed_text_or_message(parsed, "")
-        if not text:
-            text = extract_hwp(content)
+        parsed_text = _parsed_text_or_message(parsed, "")
+        if parsed_text:
+            text = parsed_text
         return _document_from_units(filename, "HWP", [{"section_index": 1, "text": text}])
     return _document_from_units(filename, "UNKNOWN", [{"section_index": 1, "text": "지원하지 않는 파일 형식입니다."}])
 
@@ -1233,11 +1249,13 @@ def _legacy_extract_file_text(filename: str, content: bytes) -> tuple[str, str]:
     if extension in IMAGE_EXTENSIONS:
         return _finalize_extracted_text(inspect_image(content)), "IMAGE"
     if extension == ".hwp":
-        parsed = parse_document(content, filename)
-        text = _parsed_text_or_message(parsed, "")
-        if text:
+        text = extract_hwp(content)
+        if text and not _is_hwp_extraction_failure(text):
             return _finalize_extracted_text(text), "HWP"
-        return _finalize_extracted_text(extract_hwp(content)), "HWP"
+
+        parsed = parse_document(content, filename)
+        parsed_text = _parsed_text_or_message(parsed, "")
+        return _finalize_extracted_text(parsed_text or text), "HWP"
     return "지원하지 않는 파일 형식입니다.", "UNKNOWN"
 
 
