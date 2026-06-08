@@ -117,35 +117,38 @@ export const VisualPanel = styled.div`
   }
 
   .source-file-list {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - 12px) / 3);
     gap: 6px;
-    padding: 8px;
+    padding: 8px 10px 10px;
     border-bottom: 1px solid #e2e8f0;
     flex: 0 0 auto;
-    max-height: 118px;
-    overflow-y: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
     background: #f8fafc;
+    scroll-snap-type: x proximity;
     scrollbar-gutter: stable;
+    scrollbar-width: thin;
   }
 
   .source-file-item {
     width: 100%;
     min-width: 0;
-    min-height: 34px;
+    height: 28px;
     border: 1px solid #cbd5e1;
-    border-radius: 8px;
+    border-radius: 7px;
     background: #ffffff;
     color: #475569;
-    padding: 0 6px 0 10px;
-    font-size: 12px;
+    padding: 0 7px;
+    font-size: 11px;
     font-weight: 800;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 5px;
     text-align: left;
-    cursor: pointer;
+    scroll-snap-align: start;
     transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
   }
 
@@ -157,8 +160,8 @@ export const VisualPanel = styled.div`
   }
 
   .source-file-item > svg {
-    width: 15px;
-    height: 15px;
+    width: 13px;
+    height: 13px;
     color: #0ea5a4;
     flex: 0 0 auto;
   }

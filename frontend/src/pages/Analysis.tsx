@@ -531,6 +531,9 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
 
     setFiles([]);
     setActiveFiles(restoredFiles);
+    if (restoredFiles.length > 0) {
+      setSelectedSourceKey(getFileKey(restoredFiles[0]));
+    }
     const restoreVersion = sourceResetVersionRef.current;
     loadSourceFiles(compactIds([
       sessionData.projectId,
@@ -1532,13 +1535,14 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
               </div>
               {sourceFiles.length > 0 && (
                 <div className="source-file-list" aria-label="업로드된 파일 목록">
-                  {sourceFiles.map((file) => (
+                  {sourceFiles.map((file, index) => (
                     <button
                       type="button"
                       key={getFileKey(file)}
                       className={`source-file-item${getFileKey(file) === getFileKey(selectedSourceFile) ? ' active' : ''}`}
                       onClick={() => setSelectedSourceKey(getFileKey(file))}
                       title={file.name}
+                      aria-label={`${index + 1}번 미리보기 파일: ${file.name}`}
                     >
                       <FiFileText aria-hidden="true" />
                       <span>{file.name}</span>
