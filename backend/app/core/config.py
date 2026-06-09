@@ -12,10 +12,13 @@ from dotenv import load_dotenv
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_DIR.parent
+ROOT_ENV_FILE = PROJECT_ROOT / ".env"
 BACKEND_ENV_FILE = BACKEND_DIR / ".env"
 
-# 실행 위치가 project_v1이든 backend이든 항상 backend/.env만 읽습니다.
-load_dotenv(BACKEND_ENV_FILE)
+# 실행 위치가 project_v1이든 backend이든 루트 공통 .env를 먼저 읽고,
+# 백엔드 전용 값은 backend/.env가 덮어씁니다.
+load_dotenv(ROOT_ENV_FILE)
+load_dotenv(BACKEND_ENV_FILE, override=True)
 
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:3000",
@@ -117,6 +120,8 @@ class Settings:
     enable_topic_modeling: bool
     topic_model_backend: str
     topic_model_limit: int
+    enable_local_translation: bool
+    local_translation_auto_install: bool
 
     @property
     def is_production(self) -> bool:
@@ -166,7 +171,7 @@ def create_settings() -> Settings:
         java_bin=os.getenv("JAVA_BIN", "java").strip() or "java",
         hwp_parser_timeout_seconds=_env_int("HWP_PARSER_TIMEOUT_SECONDS", 30),
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
-        openai_model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip(),
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip(),
         google_api_key=os.getenv("GOOGLE_API_KEY", "").strip(),
         google_client_id=(os.getenv("GOOGLE_CLIENT_ID") or os.getenv("VITE_GOOGLE_CLIENT_ID", "")).strip(),
         gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
@@ -174,7 +179,7 @@ def create_settings() -> Settings:
         enable_bert_grounding=_env_bool("ENABLE_BERT_GROUNDING", False),
         bert_grounding_model=os.getenv(
             "BERT_GROUNDING_MODEL",
-            "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+            "jhgan/ko-sroberta-multitask",
         ).strip(),
         bert_grounding_threshold=_env_float("BERT_GROUNDING_THRESHOLD", 0.62),
         bert_grounding_instruction=os.getenv(
@@ -184,6 +189,8 @@ def create_settings() -> Settings:
         enable_topic_modeling=_env_bool("ENABLE_TOPIC_MODELING", True),
         topic_model_backend=os.getenv("TOPIC_MODEL_BACKEND", "local").strip().lower(),
         topic_model_limit=_env_int("TOPIC_MODEL_LIMIT", 5),
+        enable_local_translation=_env_bool("ENABLE_LOCAL_TRANSLATION", True),
+        local_translation_auto_install=_env_bool("LOCAL_TRANSLATION_AUTO_INSTALL", True),
     )
     settings.validate()
     return settings

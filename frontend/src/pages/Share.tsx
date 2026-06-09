@@ -679,16 +679,24 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
     setNotice(`참여 완료: "${matchedProject.title}" 결과 토론방을 불러왔습니다.`);
   };
 
-  const handleCreateNewSharePage = () => {
-    writeJson(getShareRoomKey(), { ...fallbackRoom });
-    setActiveShareCode('');
+  const createNewSharedRoom = () => {
+    const inviteCode = createInviteCode();
+    const nextRoom = {
+      ...fallbackRoom,
+      inviteCode,
+      joinedCode: inviteCode,
+      members: [{ id: Date.now(), name: username, role: 'owner' }],
+    };
+
+    setActiveShareCode(inviteCode);
     setSelectedProjectId('');
     setSupportInviteCode('');
     setTypedMsg('');
     setImageDataUrls({});
     setSelectedVisualAsset(null);
-    setRoom({ ...fallbackRoom });
-    setNotice('새 공유 페이지를 만들었습니다. 초대코드를 입력해 프로젝트를 불러오세요.');
+    setRoom(nextRoom);
+    writeJson(getShareRoomKey(), nextRoom);
+    setNotice(`새 공유방을 생성했습니다. 초대코드: ${inviteCode}`);
   };
 
   const loadSupportProjectByCode = () => {
@@ -1097,6 +1105,10 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
               이미지 불러오기
             </button>
             <div className="support-code-box">
+              <button type="button" className="support-load-btn" onClick={loadSupportProjectByCode}>
+                <i className="fa-regular fa-folder-open"></i>
+                프로젝트 카드 불러오기
+              </button>
               <input
                 className="support-code-input"
                 value={supportInviteCode}
@@ -1104,10 +1116,6 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
                 onChange={(event) => setSupportInviteCode(event.target.value)}
                 onKeyDown={(event) => event.key === 'Enter' && loadSupportProjectByCode()}
               />
-              <button type="button" className="support-load-btn" onClick={loadSupportProjectByCode}>
-                <i className="fa-regular fa-folder-open"></i>
-                프로젝트 카드 불러오기
-              </button>
             </div>
             <span className="hint">메인 토론방에 보조 프로젝트를 붙여 비교합니다.</span>
           </ProjectLoadBar>
@@ -1195,9 +1203,9 @@ function ShareC({ onRestoreTrigger, username = 'Guest', initialProject = null })
       </MainTimelineContent>
 
       <RightCoopPanel $error={notice.includes('정확히')}>
-        <button className="new-share-page-btn" type="button" onClick={handleCreateNewSharePage}>
-          <i className="fa-solid fa-plus"></i>
-          새로운 공유 페이지 만들기
+        <button className="load-btn" type="button" onClick={createNewSharedRoom}>
+          <i className="fa-solid fa-rotate-right" aria-hidden="true"></i>
+          새 공유방 생성
         </button>
         <div className="invite-help">초대코드로 프로젝트를 불러옵니다</div>
         <div className="code-row top-code">

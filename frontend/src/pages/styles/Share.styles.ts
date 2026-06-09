@@ -251,14 +251,17 @@ export const ProjectLoadBar = styled.div`
     display: flex;
     align-items: center;
     gap: 8px;
-    flex: 1;
-    min-width: 360px;
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-left: auto;
   }
 
   .support-code-input {
     height: 32px;
-    flex: 1;
-    min-width: 160px;
+    flex: 0 1 210px;
+    width: 210px;
+    min-width: 180px;
+    max-width: 230px;
     border: 1px solid #bfdbfe;
     border-radius: 6px;
     padding: 0 12px;
@@ -304,6 +307,7 @@ export const ProjectLoadBar = styled.div`
     .support-code-box {
       flex-direction: column;
       align-items: stretch;
+      margin-left: 0;
       min-width: 0;
     }
 
@@ -829,6 +833,10 @@ export const RightCoopPanel = styled.aside<{ $error?: boolean }>`
     font-weight: 800;
     font-size: 14px;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
   }
 
   .invite-help {

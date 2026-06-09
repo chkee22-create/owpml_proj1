@@ -457,7 +457,7 @@ export const VisualArtifact = styled.div`
     .artifact-body {
       flex: 1;
       min-height: 0;
-      overflow: hidden;
+      overflow: auto;
     }
 
     .dynamic-visualizer {
@@ -793,10 +793,13 @@ export const PreviewModalContainer = styled.div`
   width: 90%;
   max-width: 1120px;
   height: min(760px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.2);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   
   /* 뷰어 내부 스타일 조정 (기존 VisualArtifact 디자인을 상속하되 더 넓게) */
   .artifact-head {

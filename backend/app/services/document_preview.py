@@ -1,3 +1,4 @@
+# 서비스: 문서 텍스트 전처리, 표/이미지 감지, 미리보기 생성 로직을 담고 있습니다.
 import io
 import os
 import re

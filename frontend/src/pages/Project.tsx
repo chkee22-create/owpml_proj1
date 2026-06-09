@@ -918,7 +918,7 @@ function Projects({ onProjectRestore, onShareProjectOpen }) {
                   <i className="fa-solid fa-expand" style={{ color: '#0ea5a4' }}></i>
                 </div>
               </div>
-              <div className="info-section"><h5>데이터 분석 요약</h5><p>{selectedVisual.desc}</p></div>
+              <div className="info-section"><h5>데이터 분석 요약</h5><p>{selectedVisual.desc || selectedVisual.text || '저장된 분석 요약이 없습니다.'}</p></div>
               <div className="info-section">
                 <h5>세부 정보 필드</h5>
                 <div className="details-list">

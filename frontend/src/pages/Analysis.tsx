@@ -207,7 +207,10 @@ const toStoredThread = (messages) =>
       columns: message.columns,
       series: message.series,
       data: message.data,
+      items: message.items,
       theme: message.theme,
+      layout: message.layout,
+      desc: message.desc,
       date: message.date,
       time: message.time,
       createdAt: message.createdAt,
@@ -220,7 +223,8 @@ const hasVisualPayload = (message: any = {}) => {
   const rows = Array.isArray(message.rows) ? message.rows : [];
   const columns = Array.isArray(message.columns) ? message.columns : [];
   const series = Array.isArray(message.series) ? message.series : [];
-  return data.length > 0 || rows.length > 0 || columns.length > 0 || series.length > 0 || Boolean(message.chartType);
+  const items = Array.isArray(message.items) ? message.items : [];
+  return data.length > 0 || rows.length > 0 || columns.length > 0 || series.length > 0 || items.length > 0 || Boolean(message.chartType);
 };
 
 const normalizeRestoredThread = (thread: any[] = []) =>
@@ -873,7 +877,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
     if (isAnalyzing) return;
 
     const labelMap = {
-      image: '이미지',
+      image: '이미지 파일 추출',
       graph: '그래프',
       table: '표',
     };
@@ -883,7 +887,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
     const requestMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
-      text: `${label} 만들어줘`,
+      text: visualType === 'image' ? '업로드한 이미지 파일 추출해줘' : `${label} 만들어줘`,
       createdAt: nowIso(),
     };
     const messagesWithRequest = [...messages, requestMessage];
@@ -908,6 +912,10 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
       const nextMessages = [...messagesWithRequest, visualAsset];
       setMessages(nextMessages);
       setGeneratedVisuals((prev) => [visualAsset, ...prev].slice(0, MAX_VISUALS));
+      setExpandedVisualIds((prev) => {
+        const visualId = normalizeVisualId(visualAsset.id);
+        return visualId && !prev.includes(visualId) ? [visualId, ...prev] : prev;
+      });
       upsertRecentConversation(nextMessages, requestMessage.text, nextActiveFiles);
     } catch (error) {
       const serverMessage = error.response?.data?.detail || error.userMessage || error.message || `${label} 생성에 실패했습니다.`;
@@ -930,6 +938,20 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
 
   const handleCreateVisualFromMenu = (visualType: 'image' | 'graph' | 'table') => {
     if (isAnalyzing) return;
+    if (visualType === 'image') {
+      setIsClipMenuOpen(false);
+      if (files.length > 0) {
+        window.alert('새로 선택한 파일을 먼저 분석한 뒤 이미지·차트 추출을 눌러주세요.');
+        return;
+      }
+      if (activeFiles.length > 0) {
+        handleCreateVisualFromFiles('image', activeFiles, activeFiles);
+        return;
+      }
+      pendingVisualTypeRef.current = visualType;
+      fileInputRef.current?.click();
+      return;
+    }
     if (visualType === 'table') {
       setIsClipMenuOpen(false);
       if (files.length > 0) {
@@ -1119,19 +1141,10 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
       const response = await analysisAPI.chat(question, requestFiles, {
         conversationId: recentConversationIdRef.current,
       }, getLatestAnalysisText(messages));
-      const providerName = String(response.data?.provider || 'gemini').toLowerCase();
-      const providerLabel = providerName === 'openai' ? 'OpenAI' : providerName === 'gemini' ? 'Gemini' : response.data?.provider;
-      const keySourceLabel = response.data?.llm_key_source === 'request'
-        ? '화면 입력 키'
-        : response.data?.llm_key_source === 'env'
-          ? '서버 .env 키'
-          : response.data?.llm_key_received
-            ? '서버 .env 키'
-          : '없음';
       const providerNote = response.data?.provider
         ? response.data?.llm_used
-          ? `\n\n분석 엔진: ${providerLabel}${response.data.model ? ` (${response.data.model})` : ''}\nAPI 키: ${keySourceLabel}`
-          : `\n\n분석 엔진: 로컬 기본 분석\n선택 Provider: ${providerLabel}\nAPI 키: ${keySourceLabel}${response.data?.llm_error && response.data.llm_error !== 'No grounded document context' ? `\nLLM 호출 실패: ${response.data.llm_error}` : ''}`
+          ? `\n\n분석 엔진: PaperMate`
+          : `\n\n분석 엔진: 로컬 기본 분석`
         : '';
       const answer = response.data?.answer || response.data?.summary || buildLocalFallbackAnswer(question, pendingFiles, messages);
       const successMessage = hasNewUpload
@@ -1170,6 +1183,10 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
         
         // 새로 생성된 visual을 상단 보관함(generatedVisuals)에도 추가
         setGeneratedVisuals((prev) => [newVisual, ...prev].slice(0, MAX_VISUALS));
+        setExpandedVisualIds((prev) => {
+          const visualId = normalizeVisualId(newVisual.id);
+          return visualId && !prev.includes(visualId) ? [visualId, ...prev] : prev;
+        });
       } else {
         messagesWithAnswer.push({ id: `ai-${Date.now()}`, role: 'ai', text: `${answer}${providerNote}`, createdAt: nowIso(), suggestedQuestions });
       }
@@ -1486,21 +1503,18 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
 
   const renderVisualLibraryItem = (visual, index) => {
     const visualId = normalizeVisualId(visual.id) || `${visual.title}-${index}`;
-    const isLatest = index === 0;
-    const isExpanded = isLatest || expandedVisualIds.includes(visualId);
+    const isExpanded = expandedVisualIds.includes(visualId);
 
     return (
       <div key={`${visual.id}-${index}`} className={`asset-item${isExpanded ? ' expanded' : ''}`}>
         <button
           type="button"
           className="asset-title-button"
-          onClick={() => {
-            if (!isLatest) toggleVisualExpanded(visualId);
-          }}
+          onClick={() => toggleVisualExpanded(visualId)}
           aria-expanded={isExpanded}
         >
           <strong>{visual.title}</strong>
-          {!isLatest && <span className="toggle-indicator">{isExpanded ? '접기' : '보기'}</span>}
+          <span className="toggle-indicator">{isExpanded ? '접기' : '보기'}</span>
         </button>
         <span>{visual.saved ? '프로젝트 보관함 저장됨' : '채팅창에 생성됨'}</span>
         {isExpanded && renderVisualArtifact(visual, true, false, true)}
@@ -1760,7 +1774,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
                 )}
               </div>
             ))}
-            {isAnalyzing && <AiRow><div className="ai-box">Gemini가 문서를 분석하고 있습니다...</div></AiRow>}
+            {isAnalyzing && <AiRow><div className="ai-box">PaperMate가 문서를 분석하고 있습니다...</div></AiRow>}
           </StreamMessageArea>
 
           <BottomPromptInput onKeyDownCapture={handlePromptEnter}>
@@ -1804,7 +1818,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
                     <div className="clip-menu-divider" aria-hidden="true" />
                     <button type="button" role="menuitem" onClick={() => handleCreateVisualFromMenu('image')}>
                       <FiImage aria-hidden="true" />
-                      <span>이미지 만들기</span>
+                      <span>이미지 파일 추출</span>
                     </button>
                     <button type="button" role="menuitem" onClick={() => handleCreateVisualFromMenu('graph')}>
                       <FiBarChart2 aria-hidden="true" />
