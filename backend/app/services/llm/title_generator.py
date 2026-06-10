@@ -20,9 +20,17 @@ def generate_chat_title(
         "오직 제목만 출력할 것."
     )
 
-    selected_provider = (provider or "gemini").strip().lower()
+    selected_provider = (provider or "auto").strip().lower()
+    if selected_provider == "auto":
+        if openai_api_key or settings.openai_api_key:
+            selected_provider = "openai"
+        elif google_api_key or settings.gemini_api_key or settings.google_api_key:
+            selected_provider = "gemini"
+        else:
+            selected_provider = "openai"
+
     if selected_provider in {"gemini", "google"}:
-        api_key = google_api_key or settings.gemini_api_key or settings.google_api_key or openai_api_key or settings.openai_api_key
+        api_key = google_api_key or settings.gemini_api_key or settings.google_api_key
         if not api_key:
             return question[:20]
         try:

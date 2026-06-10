@@ -16,7 +16,7 @@ from .fallback_analysis import (
 )
 from .analysis.grounding import validate_grounding
 from .llm.service import analyze_with_llm
-from .translation import ensure_korean_analysis_text
+from .translation import translate_analysis_payload
 
 
 def _is_visual_request(question: str) -> bool:
@@ -182,10 +182,40 @@ def _merge_llm_answer_with_evidence(question: str, llm_answer: str, fallback_ans
 
 
 def _with_korean_answer(payload: dict) -> dict:
-    answer = payload.get("answer")
-    if isinstance(answer, str) and answer.strip():
-        return {**payload, "answer": ensure_korean_analysis_text(answer)}
-    return payload
+    return translate_analysis_payload(payload)
+
+
+def _resolve_llm_provider_and_keys(
+    provider: str,
+    openai_api_key: str | None,
+    google_api_key: str | None,
+) -> tuple[str, str, str, bool]:
+    selected = (provider or "auto").strip().lower()
+    if selected not in {"auto", "gemini", "google", "openai"}:
+        selected = "auto"
+
+    request_openai = (openai_api_key or "").strip()
+    request_google = (google_api_key or "").strip()
+    env_openai = settings.openai_api_key
+    env_google = settings.gemini_api_key or settings.google_api_key
+
+    if selected == "openai":
+        key_source = "request" if request_openai else "env" if env_openai else "none"
+        return "openai", request_openai or env_openai, key_source, key_source != "none"
+
+    if selected in {"gemini", "google"}:
+        key_source = "request" if request_google else "env" if env_google else "none"
+        return "gemini", request_google or env_google, key_source, key_source != "none"
+
+    if request_openai:
+        return "openai", request_openai, "request", True
+    if request_google:
+        return "gemini", request_google, "request", True
+    if env_openai:
+        return "openai", env_openai, "env", True
+    if env_google:
+        return "gemini", env_google, "env", True
+    return "openai", "", "none", False
 
 
 def run_analysis_pipeline(
@@ -204,18 +234,11 @@ def run_analysis_pipeline(
     fallback_answer = build_analysis_answer(question, extracted_docs)
     has_grounded_docs = any(str(doc.get("text", "")).strip() for doc in extracted_docs)
     is_visual_request = _is_visual_request(question)
-    selected_provider = (llm_provider or "gemini").strip().lower()
-    if selected_provider not in {"gemini", "google", "openai"}:
-        selected_provider = "gemini"
-
-    request_key = (google_api_key or "").strip() if selected_provider in {"gemini", "google"} else (openai_api_key or "").strip()
-    env_key = (
-        settings.gemini_api_key or settings.google_api_key or settings.openai_api_key
-        if selected_provider in {"gemini", "google"}
-        else settings.openai_api_key
+    selected_provider, resolved_key, llm_key_source, llm_key_received = _resolve_llm_provider_and_keys(
+        llm_provider,
+        openai_api_key,
+        google_api_key,
     )
-    llm_key_source = "request" if request_key else "env" if env_key else "none"
-    llm_key_received = llm_key_source != "none"
 
     if not has_grounded_docs:
         return _with_korean_answer({
@@ -252,8 +275,8 @@ def run_analysis_pipeline(
         question,
         extracted_docs,
         provider=selected_provider,
-        openai_api_key=(openai_api_key or "").strip() or None,
-        google_api_key=(google_api_key or "").strip() or None,
+        openai_api_key=resolved_key if selected_provider == "openai" else None,
+        google_api_key=resolved_key if selected_provider == "gemini" else None,
         analysis_text=analysis_text,
         relevant_chunks=fallback_answer.get("relevant_chunks", []),
     )
@@ -298,11 +321,11 @@ def run_analysis_pipeline(
     if not grounding.get("passed"):
         return _with_korean_answer({
             **fallback_answer,
-            "answer": build_concise_fallback_answer(question, fallback_answer),
-            "llm_used": False,
+            "answer": _merge_llm_answer_with_evidence(question, llm_answer["answer"], fallback_answer),
+            "llm_used": True,
             "provider": llm_answer.get("provider"),
             "model": llm_answer.get("model"),
-            "llm_error": "LLM 답변에 문서 근거와 맞지 않는 내용이 있어 로컬 근거 답변으로 전환했습니다.",
+            "llm_error": "PaperMate가 문서 근거 점검에서 일부 낮은 일치도를 감지했습니다. 답변 아래 근거 구간을 함께 확인해주세요.",
             "llm_key_received": llm_key_received,
             "llm_key_source": llm_key_source,
             "suggested_questions": llm_answer.get("suggested_questions", []),

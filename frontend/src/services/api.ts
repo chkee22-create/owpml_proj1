@@ -124,7 +124,7 @@ export const analysisAPI = {
     const formData = new FormData();
     formData.append('question', question);
     if (options.conversationId) formData.append('conversation_id', options.conversationId);
-    formData.append('llm_provider', options.llmProvider || 'gemini');
+    formData.append('llm_provider', options.llmProvider || 'auto');
     if (options.openaiApiKey) formData.append('openai_api_key', options.openaiApiKey);
     if (options.googleApiKey) formData.append('google_api_key', options.googleApiKey);
     if (analysisText) formData.append('analysis_text', analysisText);
@@ -140,7 +140,7 @@ export const analysisAPI = {
   generateChatTitle: (question: string, options: AnalysisChatOptions = {}, analysisText = '') => {
     const formData = new FormData();
     formData.append('question', question);
-    formData.append('llm_provider', options.llmProvider || 'gemini');
+    formData.append('llm_provider', options.llmProvider || 'auto');
     if (options.openaiApiKey) formData.append('openai_api_key', options.openaiApiKey);
     if (options.googleApiKey) formData.append('google_api_key', options.googleApiKey);
     if (analysisText) formData.append('analysis_text', analysisText);

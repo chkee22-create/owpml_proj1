@@ -22,7 +22,7 @@ DOCUMENT_SESSION_CACHE: dict[str, list[dict]] = {}
 async def analyze_chat(
     question: str = Form(""),
     conversation_id: str = Form(""),
-    llm_provider: str = Form("gemini"),
+    llm_provider: str = Form("auto"),
     openai_api_key: str = Form(""),
     google_api_key: str = Form(""),
     files: list[UploadFile] = File(default=[]),
@@ -81,14 +81,14 @@ async def analyze_chat(
 @router.post("/title")
 async def generate_title(
     question: str = Form(""),
-    llm_provider: str = Form("gemini"),
+    llm_provider: str = Form("auto"),
     openai_api_key: str = Form(""),
     google_api_key: str = Form(""),
     analysis_text: str = Form("")
 ):
-    selected_provider = (llm_provider or "gemini").strip().lower()
-    if selected_provider not in {"gemini", "google", "openai"}:
-        selected_provider = "gemini"
+    selected_provider = (llm_provider or "auto").strip().lower()
+    if selected_provider not in {"auto", "gemini", "google", "openai"}:
+        selected_provider = "auto"
     
     from ..services.llm.title_generator import generate_chat_title
     

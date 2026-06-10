@@ -7,7 +7,7 @@ import urllib.request
 
 from app.core.config import settings
 from app.services.llm.prompt_builder import MAX_GEMINI_CONTEXT_CHARS, MIN_GEMINI_CONTEXT_CHARS, build_prompts, is_visual_request
-from app.services.llm.response_utils import llm_error, parse_suggested_questions, postprocess_visual_answer
+from app.services.llm.response_utils import llm_error, needs_korean_rewrite, parse_suggested_questions, postprocess_visual_answer
 
 
 def extract_gemini_text(payload: dict) -> str:
@@ -51,6 +51,28 @@ def call_gemini(api_key: str, model: str, system_prompt: str, user_prompt: str) 
     with urllib.request.urlopen(request, timeout=300) as response:
         data = json.loads(response.read().decode("utf-8"))
     return extract_gemini_text(data)
+
+
+def rewrite_answer_with_gemini(answer: str, api_key: str, model: str) -> str:
+    prompt = (
+        "아래 답변은 문서 분석 결과입니다. 사용자가 보는 최종 답변은 반드시 자연스러운 한국어여야 합니다.\n"
+        "원문이 영어여도 분석 내용, 요약, 추천 질문, 표/차트 라벨 설명은 한국어로 번역하세요.\n"
+        "고유명사, 논문 제목, 모델명, 기술 약어, 수치, 인용 표기, JSON 키, "
+        "'===SUGGESTED_QUESTIONS===' 구분자는 보존하세요.\n"
+        "의미를 추가하거나 삭제하지 말고 번역과 한국어 문장 다듬기만 수행하세요.\n\n"
+        f"[답변]\n{answer}"
+    )
+    try:
+        rewritten = call_gemini(
+            api_key,
+            model,
+            "You are a Korean translation and editing assistant. Return only the rewritten Korean answer.",
+            prompt,
+        )
+        return rewritten.strip() or answer
+    except Exception as exc:
+        print(f"Gemini Korean rewrite failed: {exc}")
+        return answer
 
 
 def http_error_detail(exc: urllib.error.HTTPError) -> str:
@@ -117,6 +139,9 @@ def analyze_with_gemini(
             "model": used_model,
             "provider": "gemini",
         }
+
+    if needs_korean_rewrite(answer):
+        answer = rewrite_answer_with_gemini(answer, api_key, used_model)
 
     main_answer, questions = parse_suggested_questions(answer)
     return {
