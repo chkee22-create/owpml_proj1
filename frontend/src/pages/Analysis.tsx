@@ -5,7 +5,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { FiBarChart2, FiFileText, FiGrid, FiImage, FiPaperclip, FiRefreshCcw } from 'react-icons/fi';
+import { FiBarChart2, FiChevronLeft, FiChevronRight, FiFileText, FiGrid, FiImage, FiPaperclip, FiRefreshCcw } from 'react-icons/fi';
 import {
   AiRow,
   BottomPromptInput,
@@ -505,8 +505,9 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
   const [selectedSourceKey, setSelectedSourceKey] = useState('');
   const [sourcePreview, setSourcePreview] = useState({ kind: 'empty', url: '', text: '', message: '' });
   const [sourcePreviewCache, setSourcePreviewCache] = useState<Record<string, any>>({});
-  const [sourcePaneWidth, setSourcePaneWidth] = useState(58);
+  const [sourcePaneWidth, setSourcePaneWidth] = useState(72);
   const [isResizingSource, setIsResizingSource] = useState(false);
+  const [isVisualLibraryCollapsed, setIsVisualLibraryCollapsed] = useState(true);
   const [isClipMenuOpen, setIsClipMenuOpen] = useState(false);
   const [llmProvider, setLlmProvider] = useState('auto');
 
@@ -1581,9 +1582,9 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
     <Container>
       <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} multiple />
       <MainLayout>
-        <VisualPanel>
+        <VisualPanel $libraryCollapsed={isVisualLibraryCollapsed}>
           <div
-            className={`compare-shell${isResizingSource ? ' is-resizing' : ''}`}
+            className={`compare-shell${isResizingSource ? ' is-resizing' : ''}${isVisualLibraryCollapsed ? ' library-collapsed' : ''}`}
             ref={compareShellRef}
             style={{ '--source-pane-width': `${sourcePaneWidth}%` } as React.CSSProperties}
           >
@@ -1593,6 +1594,17 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
                   <div className="title">미리보기</div>
                   <p className="hint">업로드한 원본을 보면서 시각화와 바로 비교합니다.</p>
                 </div>
+                <button
+                  type="button"
+                  className="library-toggle"
+                  onClick={() => setIsVisualLibraryCollapsed((prev) => !prev)}
+                  aria-expanded={!isVisualLibraryCollapsed}
+                  aria-label={isVisualLibraryCollapsed ? '시각화 보관함 열기' : '시각화 보관함 접기'}
+                  title={isVisualLibraryCollapsed ? '시각화 보관함 열기' : '시각화 보관함 접기'}
+                >
+                  {isVisualLibraryCollapsed ? <FiChevronLeft aria-hidden="true" /> : <FiChevronRight aria-hidden="true" />}
+                  <span>보관함</span>
+                </button>
               </div>
               {sourceFiles.length > 0 && (
                 <div className="source-file-list" aria-label="업로드된 파일 목록">
@@ -1646,7 +1658,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
               />
             )}
 
-            <section className="visual-library">
+            <section className="visual-library" aria-hidden={isVisualLibraryCollapsed}>
               <div className="panel-head">
                 <div>
                   <div className="title">시각화 보관함</div>
@@ -1662,16 +1674,6 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
                 ) : visibleVisuals.map((visual, index) => renderVisualLibraryItem(visual, index))}
               </div>
             </section>
-          </div>
-          <div className="title">시각화 보관함</div>
-          <p className="hint">채팅으로 요청해 생성된 표와 그래프가 여기에 모입니다.</p>
-          <div className="asset-list">
-            {visibleVisuals.length === 0 ? (
-              <div className="asset-item">
-                <strong>아직 생성된 자료가 없습니다.</strong>
-                <span>채팅창에 “표로 정리해줘”, “그래프로 만들어줘”처럼 요청하면 여기에 표시됩니다.</span>
-              </div>
-            ) : visibleVisuals.map((visual, index) => renderVisualLibraryItem(visual, index))}
           </div>
         </VisualPanel>
 
