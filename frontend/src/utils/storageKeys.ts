@@ -21,6 +21,23 @@ const isQuotaExceededError = (error) =>
 // 이미지 dataUrl 같은 큰 값은 localStorage 한도를 빨리 넘기므로, 공유 검색과 카드 복원에 필요한 가벼운 정보만 남깁니다.
 export const normalizeInviteCode = (code = '') => String(code || '').trim();
 
+const compactVisualItems = (items) =>
+  Array.isArray(items)
+    ? items.slice(0, 12).map((item) => ({
+        id: item.id,
+        filename: item.filename,
+        kind: item.kind,
+        name: item.name,
+        source: item.source,
+        width: item.width,
+        height: item.height,
+        mimeType: item.mimeType,
+        ocrText: item.ocrText,
+        previewText: item.previewText,
+        dataUrl: item.dataUrl,
+      }))
+    : undefined;
+
 export const compactProjectForSharedIndex = (project) => ({
   id: project.id,
   source: project.source,
@@ -49,6 +66,7 @@ export const compactProjectForSharedIndex = (project) => ({
         theme: visual.theme,
         details: Array.isArray(visual.details) ? visual.details.slice(0, 8) : [],
         rows: Array.isArray(visual.rows) ? visual.rows.slice(0, 8) : undefined,
+        items: compactVisualItems(visual.items),
         date: visual.date,
         projectTitle: visual.projectTitle,
       }))
@@ -68,6 +86,7 @@ export const compactProjectForSharedIndex = (project) => ({
         data: Array.isArray(item.data) ? item.data.slice(0, 80) : undefined,
         theme: item.theme,
         rows: Array.isArray(item.rows) ? item.rows.slice(0, 8) : undefined,
+        items: compactVisualItems(item.items),
       }))
     : [],
   discussionImages: Array.isArray(project.discussionImages)

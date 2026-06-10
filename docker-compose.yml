@@ -20,6 +20,10 @@ services:
     environment:
       MONGO_URL: mongodb://mongo:27017
       ENABLE_API_DOCS: "false"
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-${VITE_GOOGLE_CLIENT_ID}}
+      HF_HOME: /root/.cache/huggingface
+    volumes:
+      - papermate_hf_cache:/root/.cache/huggingface
     ports:
       - "8000:8000"
     depends_on:
@@ -35,6 +39,9 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+        VITE_GOOGLE_ALLOWED_ORIGINS: ${VITE_GOOGLE_ALLOWED_ORIGINS}
     restart: unless-stopped
     ports:
       - "3000:80"
@@ -44,3 +51,4 @@ services:
 
 volumes:
   papermate_mongo:
+  papermate_hf_cache:

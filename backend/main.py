@@ -19,6 +19,7 @@ from app.core.config import settings
 from app.core.database import close_database, ensure_indexes, ping_database
 from app.routers.analysis import router as analysis_router
 from app.routers.auth import router as auth_router
+from app.routers.document_previews import router as document_previews_router
 from app.routers.discussion_comments import router as discussion_comments_router
 from app.routers.project_files import router as project_files_router
 from app.routers.project_threads import router as project_threads_router
@@ -44,6 +45,7 @@ def _register_routers(api: FastAPI) -> None:
 
     api.include_router(auth_router)
     api.include_router(analysis_router)
+    api.include_router(document_previews_router)
     api.include_router(projects_router)
     api.include_router(visuals_router)
     api.include_router(visual_assets_router)
@@ -111,6 +113,13 @@ async def add_request_context(request: Request, call_next):
         raise
 
     elapsed_ms = (time.perf_counter() - started_at) * 1000
+    # 추가 디버깅: 인증 실패를 조사할 때 어떤 요청이 401을 반환했는지 확인하기 쉽도록 로그를 남깁니다.
+    if getattr(response, "status_code", None) == status.HTTP_401_UNAUTHORIZED:
+        auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+        logger.warning(
+            "Unauthorized response returned",
+            extra={"request_id": request_id, "path": request.url.path, "auth_header_present": bool(auth_header)},
+        )
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Process-Time-MS"] = f"{elapsed_ms:.2f}"
     return response

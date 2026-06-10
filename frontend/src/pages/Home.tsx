@@ -46,6 +46,7 @@ const VIEW = {
   ANALYSIS: "분석 비교",
   PROJECTS: "내 프로젝트",
   MYPAGE: "마이페이지",
+  FAQ: "FAQ",
 };
 
 const VIEW_TO_ROUTE = {
@@ -55,6 +56,7 @@ const VIEW_TO_ROUTE = {
   [VIEW.ANALYSIS]: "analysis",
   [VIEW.PROJECTS]: "projects",
   [VIEW.MYPAGE]: "mypage",
+  [VIEW.FAQ]: "faq",
 };
 
 const ROUTE_TO_VIEW = Object.fromEntries(
@@ -154,6 +156,7 @@ function Home() {
   const [analysisSessionKey, setAnalysisSessionKey] = useState(
     () => `analysis-${Date.now()}`,
   );
+  const [newAnalysisSignal, setNewAnalysisSignal] = useState(0);
 
   const navigateToView = (nextView: string, options: NavigateOptions = {}) => {
     const {
@@ -248,7 +251,9 @@ function Home() {
     else if (menuName === VIEW.MYPAGE || menuName === "프로필")
       navigateToView(VIEW.MYPAGE);
     else if (menuName === "새 채팅") {
-      setAnalysisSessionKey(`analysis-${Date.now()}`);
+      sessionStorage.setItem("papermate.skipActiveAnalysisRestore", "1");
+      setNewAnalysisSignal((prev) => prev + 1);
+      setAnalysisSessionKey(`analysis-new-${Date.now()}-${Math.random()}`);
       navigateToView(VIEW.ANALYSIS, { clearRestoredData: true });
     }
   };
@@ -658,9 +663,19 @@ function Home() {
         {viewMode === VIEW.MYPAGE && (
           <MypageC onLogoutClick={handleAbsoluteLogout} />
         )}
-        {viewMode === VIEW.FAQ && <FAQC />}
+        {viewMode === VIEW.FAQ && (
+          <FAQC
+            onBackHome={() => navigateToView(VIEW.MAIN, { replace: true })}
+            showHomeLogo={isSidebarCollapsed}
+          />
+        )}
         {viewMode === VIEW.SHARE && (
           <ShareC
+            key={
+              shareOpenData?.projectId || shareOpenData?.inviteCode
+                ? `share-${shareOpenData?.projectId || shareOpenData?.inviteCode}`
+                : "share-new"
+            }
             onRestoreTrigger={handleTimelineRestoreJump}
             username={user?.username}
             initialProject={shareOpenData}
@@ -670,6 +685,7 @@ function Home() {
           <AnalysisC
             key={analysisSessionKey}
             restoredData={restoredData}
+            newAnalysisSignal={newAnalysisSignal}
             clearRestore={() => setRestoredData(null)}
             onConversationChange={handleConversationChange}
             onLoginRequired={() => setModalMode("recommend")}

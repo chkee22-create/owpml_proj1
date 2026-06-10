@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import styled from "styled-components";
+import papermateLogo from "../assets/papermate-logo.png";
 
 const FAQContainer = styled.div`
   height: 100%;
   width: 100%;
   overflow-y: auto;
-  padding: 40px 32px;
+  padding: 40px 32px 40px 72px;
   color: #1f2937;
   position: relative;
   box-sizing: border-box;
@@ -112,16 +113,86 @@ const FAQContainer = styled.div`
     color: #0f172a;
     border: 1px solid #cbd5e1;
   }
+
+  .home-logo-button {
+    position: absolute;
+    top: 24px;
+    left: 96px;
+    width: 210px;
+    height: 84px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    transition: transform 0.16s ease, filter 0.16s ease;
+  }
+
+  .home-logo-button:hover {
+    transform: translateY(-1px);
+    filter: drop-shadow(0 12px 18px rgba(15, 118, 110, 0.16));
+  }
+
+  .home-logo-button:focus-visible {
+    outline: 3px solid rgba(20, 184, 166, 0.35);
+    outline-offset: 3px;
+  }
+
+  .home-logo-button img {
+    display: block;
+    width: 210px;
+    height: 84px;
+    object-fit: contain;
+  }
+
+  @media (max-width: 1360px) {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 32px 28px;
+
+    .home-logo-button {
+      position: relative;
+      top: 0;
+      left: 0;
+      width: 180px;
+      height: 72px;
+      margin: 0 auto 22px;
+      flex-shrink: 0;
+    }
+
+    .home-logo-button img {
+      width: 180px;
+      height: 72px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    padding: 32px 20px;
+
+    .home-logo-button {
+      width: 150px;
+      height: 60px;
+    }
+
+    .home-logo-button img {
+      width: 150px;
+      height: 60px;
+    }
+  }
 `;
 
 const FAQContent = styled.div`
   width: 100%;
   max-width: 950px;
   margin: 0 auto;
+  transform: translateX(50px);
 
   h2 {
     font-size: 32px;
-    margin-bottom: 24px;
+    margin: 0 0 24px;
     color: #0f172a;
   }
 
@@ -274,6 +345,78 @@ const FAQContent = styled.div`
     color: #0f172a;
     border: 1px solid #cbd5e1;
   }
+
+  @media (max-width: 1360px) {
+    max-width: 100%;
+    margin: 0;
+    transform: translateX(50px);
+
+    h2 {
+      font-size: 24px;
+      line-height: 1.25;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+
+    p.description {
+      font-size: 13.5px;
+      line-height: 1.65;
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
+    .tab-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .tab-button {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 13px;
+      border-radius: 12px;
+      white-space: normal;
+      word-break: keep-all;
+    }
+
+    .tab-panel {
+      border-radius: 14px;
+      padding: 20px;
+    }
+
+    .question {
+      margin-top: 18px;
+    }
+
+    .question h3 {
+      font-size: 16px;
+      line-height: 1.4;
+    }
+
+    .question p,
+    .question li {
+      font-size: 13.5px;
+      line-height: 1.7;
+    }
+  }
+
+  @media (min-width: 761px) and (max-width: 1360px) {
+    max-width: 820px;
+
+    h2 {
+      font-size: 28px;
+    }
+
+    p.description {
+      font-size: 14px;
+    }
+
+    .tab-list {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
 `;
 
 const tabItems = [
@@ -283,7 +426,12 @@ const tabItems = [
   { id: "contact", label: "관리자 문의" },
 ];
 
-function FAQC() {
+interface FAQProps {
+  onBackHome?: () => void;
+  showHomeLogo?: boolean;
+}
+
+function FAQC({ onBackHome, showHomeLogo = true }: FAQProps) {
   const [activeTab, setActiveTab] = useState("usage");
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [contactMessage, setContactMessage] = useState("");
@@ -301,6 +449,17 @@ function FAQC() {
 
   return (
     <FAQContainer>
+      {showHomeLogo && (
+        <button
+          type="button"
+          className="home-logo-button"
+          onClick={onBackHome}
+          aria-label="메인 화면으로 이동"
+          title="메인 화면으로 이동"
+        >
+          <img src={papermateLogo} alt="PaperMate" />
+        </button>
+      )}
       <FAQContent>
       <h2>자주 묻는 질문 (FAQ)</h2>
       <p className="description">

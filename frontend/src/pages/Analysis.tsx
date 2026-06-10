@@ -2,10 +2,10 @@
 // TypeScript 변경 표시: 기존 JS 로직은 유지하면서 함수 인자와 화면 props에 실제 타입을 붙여 TypeScript 검사를 통과하게 했습니다.
 // 초보자 안내: 사용자가 실제로 보게 되는 한 화면 단위의 React 페이지 컴포넌트입니다.
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { FiBarChart2, FiFileText, FiGrid, FiImage, FiPaperclip, FiRefreshCcw } from 'react-icons/fi';
+import { FiBarChart2, FiChevronLeft, FiChevronRight, FiFileText, FiGrid, FiImage, FiPaperclip, FiRefreshCcw } from 'react-icons/fi';
 import {
   AiRow,
   BottomPromptInput,
@@ -207,7 +207,10 @@ const toStoredThread = (messages) =>
       columns: message.columns,
       series: message.series,
       data: message.data,
+      items: message.items,
       theme: message.theme,
+      layout: message.layout,
+      desc: message.desc,
       date: message.date,
       time: message.time,
       createdAt: message.createdAt,
@@ -220,7 +223,8 @@ const hasVisualPayload = (message: any = {}) => {
   const rows = Array.isArray(message.rows) ? message.rows : [];
   const columns = Array.isArray(message.columns) ? message.columns : [];
   const series = Array.isArray(message.series) ? message.series : [];
-  return data.length > 0 || rows.length > 0 || columns.length > 0 || series.length > 0 || Boolean(message.chartType);
+  const items = Array.isArray(message.items) ? message.items : [];
+  return data.length > 0 || rows.length > 0 || columns.length > 0 || series.length > 0 || items.length > 0 || Boolean(message.chartType);
 };
 
 const normalizeRestoredThread = (thread: any[] = []) =>
@@ -501,12 +505,14 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
   const [selectedSourceKey, setSelectedSourceKey] = useState('');
   const [sourcePreview, setSourcePreview] = useState({ kind: 'empty', url: '', text: '', message: '' });
   const [sourcePreviewCache, setSourcePreviewCache] = useState<Record<string, any>>({});
-  const [sourcePaneWidth, setSourcePaneWidth] = useState(58);
+  const [sourcePaneWidth, setSourcePaneWidth] = useState(72);
   const [isResizingSource, setIsResizingSource] = useState(false);
+  const [isVisualLibraryCollapsed, setIsVisualLibraryCollapsed] = useState(true);
   const [isClipMenuOpen, setIsClipMenuOpen] = useState(false);
+  const [llmProvider, setLlmProvider] = useState('auto');
 
   const currentInviteCode = currentProject?.inviteCode || restoredData?.inviteCode || '저장 후 생성';
-  const sourceFiles = activeFiles;
+  const sourceFiles = useMemo(() => mergeUniqueFiles(activeFiles, files), [activeFiles, files]);
   const selectedSourceFile = sourceFiles.find((file) => getFileKey(file) === selectedSourceKey) || sourceFiles[0];
 
   const cacheSourcePreview = (fileKey: string, preview: any) => {
@@ -565,6 +571,9 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
 
     setFiles([]);
     setActiveFiles(restoredFiles);
+    if (restoredFiles.length > 0) {
+      setSelectedSourceKey(getFileKey(restoredFiles[0]));
+    }
     const restoreVersion = sourceResetVersionRef.current;
     loadSourceFiles(compactIds([
       sessionData.projectId,
@@ -833,6 +842,8 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
     }
 
     setFiles(nextFiles);
+    setSelectedSourceKey(getFileKey(selectedFiles[0]));
+    setPromptText((current) => (current.trim() ? current : '분석해 드릴까요?'));
     writeJson(getActiveAnalysisSessionKey(), {
       id: recentConversationIdRef.current,
       conversationId: recentConversationIdRef.current,
@@ -868,7 +879,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
     if (isAnalyzing) return;
 
     const labelMap = {
-      image: '이미지',
+      image: '이미지 파일 추출',
       graph: '그래프',
       table: '표',
     };
@@ -878,7 +889,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
     const requestMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
-      text: `${label} 만들어줘`,
+      text: visualType === 'image' ? '업로드한 이미지 파일 추출해줘' : `${label} 만들어줘`,
       createdAt: nowIso(),
     };
     const messagesWithRequest = [...messages, requestMessage];
@@ -903,6 +914,10 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
       const nextMessages = [...messagesWithRequest, visualAsset];
       setMessages(nextMessages);
       setGeneratedVisuals((prev) => [visualAsset, ...prev].slice(0, MAX_VISUALS));
+      setExpandedVisualIds((prev) => {
+        const visualId = normalizeVisualId(visualAsset.id);
+        return visualId && !prev.includes(visualId) ? [visualId, ...prev] : prev;
+      });
       upsertRecentConversation(nextMessages, requestMessage.text, nextActiveFiles);
     } catch (error) {
       const serverMessage = error.response?.data?.detail || error.userMessage || error.message || `${label} 생성에 실패했습니다.`;
@@ -925,6 +940,29 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
 
   const handleCreateVisualFromMenu = (visualType: 'image' | 'graph' | 'table') => {
     if (isAnalyzing) return;
+    if (visualType === 'image') {
+      setIsClipMenuOpen(false);
+      if (files.length > 0) {
+        window.alert('새로 선택한 파일을 먼저 분석한 뒤 이미지·차트 추출을 눌러주세요.');
+        return;
+      }
+      if (activeFiles.length > 0) {
+        handleCreateVisualFromFiles('image', activeFiles, activeFiles);
+        return;
+      }
+      pendingVisualTypeRef.current = visualType;
+      fileInputRef.current?.click();
+      return;
+    }
+    if (visualType === 'table') {
+      setIsClipMenuOpen(false);
+      if (files.length > 0) {
+        window.alert('새로 선택한 파일을 먼저 분석한 뒤 표 만들기를 눌러주세요.');
+        return;
+      }
+      handleCreateVisualFromFiles('table', activeFiles, activeFiles);
+      return;
+    }
     pendingVisualTypeRef.current = visualType;
     setIsClipMenuOpen(false);
     fileInputRef.current?.click();
@@ -1040,8 +1078,11 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
   const handleSendMessage = async (filesToSend = files, overrideQuestion = '') => {
     const nextQuestion = overrideQuestion || promptText.trim();
     const newFiles = [...filesToSend];
+    const activeUploadFiles = activeFiles.filter(isUploadableFile);
     const pendingFiles = newFiles.length > 0 ? mergeUniqueFiles(activeFiles, newFiles) : [...activeFiles];
-    const requestFiles = pendingFiles.filter(isUploadableFile);
+    const requestFiles = newFiles.length > 0
+      ? mergeUniqueFiles(activeUploadFiles, newFiles.filter(isUploadableFile))
+      : activeUploadFiles;
     const hasNewUpload = newFiles.length > 0;
     if (!nextQuestion && pendingFiles.length === 0) {
       window.alert('질문을 입력하거나 파일을 선택해주세요.');
@@ -1101,20 +1142,17 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
     try {
       const response = await analysisAPI.chat(question, requestFiles, {
         conversationId: recentConversationIdRef.current,
+        llmProvider,
       }, getLatestAnalysisText(messages));
-      const providerName = String(response.data?.provider || 'gemini').toLowerCase();
-      const providerLabel = providerName === 'openai' ? 'OpenAI' : providerName === 'gemini' ? 'Gemini' : response.data?.provider;
-      const keySourceLabel = response.data?.llm_key_source === 'request'
-        ? '화면 입력 키'
-        : response.data?.llm_key_source === 'env'
-          ? '서버 .env 키'
-          : response.data?.llm_key_received
-            ? '서버 .env 키'
-          : '없음';
+      const providerLabelMap: Record<string, string> = {
+        openai: 'OpenAI',
+        gemini: 'Gemini',
+        google: 'Gemini',
+      };
       const providerNote = response.data?.provider
         ? response.data?.llm_used
-          ? `\n\n분석 엔진: ${providerLabel}${response.data.model ? ` (${response.data.model})` : ''}\nAPI 키: ${keySourceLabel}`
-          : `\n\n분석 엔진: 로컬 기본 분석\n선택 Provider: ${providerLabel}\nAPI 키: ${keySourceLabel}${response.data?.llm_error && response.data.llm_error !== 'No grounded document context' ? `\nLLM 호출 실패: ${response.data.llm_error}` : ''}`
+          ? `\n\n분석 엔진: PaperMate (${providerLabelMap[response.data.provider] || response.data.provider})`
+          : `\n\n분석 엔진: 로컬 기본 분석`
         : '';
       const answer = response.data?.answer || response.data?.summary || buildLocalFallbackAnswer(question, pendingFiles, messages);
       const successMessage = hasNewUpload
@@ -1153,6 +1191,10 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
         
         // 새로 생성된 visual을 상단 보관함(generatedVisuals)에도 추가
         setGeneratedVisuals((prev) => [newVisual, ...prev].slice(0, MAX_VISUALS));
+        setExpandedVisualIds((prev) => {
+          const visualId = normalizeVisualId(newVisual.id);
+          return visualId && !prev.includes(visualId) ? [visualId, ...prev] : prev;
+        });
       } else {
         messagesWithAnswer.push({ id: `ai-${Date.now()}`, role: 'ai', text: `${answer}${providerNote}`, createdAt: nowIso(), suggestedQuestions });
       }
@@ -1164,6 +1206,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
       // 첫 질문인 경우, 백그라운드에서 AI 채팅방 제목 생성 호출
       if (isNewConversation) {
         analysisAPI.generateChatTitle(question, {
+          llmProvider,
         }, getLatestAnalysisText(messages)).then(res => {
           if (res.data?.title) {
             upsertRecentConversation(messagesWithAnswer, question, pendingFiles, res.data.title);
@@ -1469,21 +1512,18 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
 
   const renderVisualLibraryItem = (visual, index) => {
     const visualId = normalizeVisualId(visual.id) || `${visual.title}-${index}`;
-    const isLatest = index === 0;
-    const isExpanded = isLatest || expandedVisualIds.includes(visualId);
+    const isExpanded = expandedVisualIds.includes(visualId);
 
     return (
       <div key={`${visual.id}-${index}`} className={`asset-item${isExpanded ? ' expanded' : ''}`}>
         <button
           type="button"
           className="asset-title-button"
-          onClick={() => {
-            if (!isLatest) toggleVisualExpanded(visualId);
-          }}
+          onClick={() => toggleVisualExpanded(visualId)}
           aria-expanded={isExpanded}
         >
           <strong>{visual.title}</strong>
-          {!isLatest && <span className="toggle-indicator">{isExpanded ? '접기' : '보기'}</span>}
+          <span className="toggle-indicator">{isExpanded ? '접기' : '보기'}</span>
         </button>
         <span>{visual.saved ? '프로젝트 보관함 저장됨' : '채팅창에 생성됨'}</span>
         {isExpanded && renderVisualArtifact(visual, true, false, true)}
@@ -1542,9 +1582,9 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
     <Container>
       <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} multiple />
       <MainLayout>
-        <VisualPanel>
+        <VisualPanel $libraryCollapsed={isVisualLibraryCollapsed}>
           <div
-            className={`compare-shell${isResizingSource ? ' is-resizing' : ''}`}
+            className={`compare-shell${isResizingSource ? ' is-resizing' : ''}${isVisualLibraryCollapsed ? ' library-collapsed' : ''}`}
             ref={compareShellRef}
             style={{ '--source-pane-width': `${sourcePaneWidth}%` } as React.CSSProperties}
           >
@@ -1554,16 +1594,28 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
                   <div className="title">미리보기</div>
                   <p className="hint">업로드한 원본을 보면서 시각화와 바로 비교합니다.</p>
                 </div>
+                <button
+                  type="button"
+                  className="library-toggle"
+                  onClick={() => setIsVisualLibraryCollapsed((prev) => !prev)}
+                  aria-expanded={!isVisualLibraryCollapsed}
+                  aria-label={isVisualLibraryCollapsed ? '시각화 보관함 열기' : '시각화 보관함 접기'}
+                  title={isVisualLibraryCollapsed ? '시각화 보관함 열기' : '시각화 보관함 접기'}
+                >
+                  {isVisualLibraryCollapsed ? <FiChevronLeft aria-hidden="true" /> : <FiChevronRight aria-hidden="true" />}
+                  <span>보관함</span>
+                </button>
               </div>
               {sourceFiles.length > 0 && (
                 <div className="source-file-list" aria-label="업로드된 파일 목록">
-                  {sourceFiles.map((file) => (
+                  {sourceFiles.map((file, index) => (
                     <button
                       type="button"
                       key={getFileKey(file)}
                       className={`source-file-item${getFileKey(file) === getFileKey(selectedSourceFile) ? ' active' : ''}`}
                       onClick={() => setSelectedSourceKey(getFileKey(file))}
                       title={file.name}
+                      aria-label={`${index + 1}번 미리보기 파일: ${file.name}`}
                     >
                       <FiFileText aria-hidden="true" />
                       <span>{file.name}</span>
@@ -1606,7 +1658,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
               />
             )}
 
-            <section className="visual-library">
+            <section className="visual-library" aria-hidden={isVisualLibraryCollapsed}>
               <div className="panel-head">
                 <div>
                   <div className="title">시각화 보관함</div>
@@ -1622,16 +1674,6 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
                 ) : visibleVisuals.map((visual, index) => renderVisualLibraryItem(visual, index))}
               </div>
             </section>
-          </div>
-          <div className="title">시각화 보관함</div>
-          <p className="hint">채팅으로 요청해 생성된 표와 그래프가 여기에 모입니다.</p>
-          <div className="asset-list">
-            {visibleVisuals.length === 0 ? (
-              <div className="asset-item">
-                <strong>아직 생성된 자료가 없습니다.</strong>
-                <span>채팅창에 “표로 정리해줘”, “그래프로 만들어줘”처럼 요청하면 여기에 표시됩니다.</span>
-              </div>
-            ) : visibleVisuals.map((visual, index) => renderVisualLibraryItem(visual, index))}
           </div>
         </VisualPanel>
 
@@ -1742,7 +1784,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
                 )}
               </div>
             ))}
-            {isAnalyzing && <AiRow><div className="ai-box">Gemini가 문서를 분석하고 있습니다...</div></AiRow>}
+            {isAnalyzing && <AiRow><div className="ai-box">PaperMate가 문서를 분석하고 있습니다...</div></AiRow>}
           </StreamMessageArea>
 
           <BottomPromptInput onKeyDownCapture={handlePromptEnter}>
@@ -1786,7 +1828,7 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
                     <div className="clip-menu-divider" aria-hidden="true" />
                     <button type="button" role="menuitem" onClick={() => handleCreateVisualFromMenu('image')}>
                       <FiImage aria-hidden="true" />
-                      <span>이미지 만들기</span>
+                      <span>이미지 파일 추출</span>
                     </button>
                     <button type="button" role="menuitem" onClick={() => handleCreateVisualFromMenu('graph')}>
                       <FiBarChart2 aria-hidden="true" />
@@ -1805,6 +1847,17 @@ function AnalysisC({ projectId, projectTitle, restoredData, newAnalysisSignal, c
                 placeholder={files.length > 0 ? `${files.length}개 파일 기준으로 질문을 입력하세요...` : '분석 질문을 입력하세요...'}
                 onChange={(event) => setPromptText(event.target.value)}
               />
+              <select
+                className="provider-select"
+                value={llmProvider}
+                onChange={(event) => setLlmProvider(event.target.value)}
+                title="분석 엔진 선택"
+                aria-label="분석 엔진 선택"
+              >
+                <option value="auto">자동</option>
+                <option value="openai">OpenAI</option>
+                <option value="gemini">Gemini</option>
+              </select>
               <button type="button" onClick={() => handleSendMessage(files)}>전송</button>
             </div>
           </BottomPromptInput>
