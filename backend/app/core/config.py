@@ -21,6 +21,7 @@ load_dotenv(ROOT_ENV_FILE)
 load_dotenv(BACKEND_ENV_FILE, override=True)
 
 DEFAULT_CORS_ORIGINS = [
+    "https://owpml-proj1.vercel.app",    
     "http://localhost:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3000",
